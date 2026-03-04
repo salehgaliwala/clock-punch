@@ -139,10 +139,18 @@ function handleUpdateUser(data) {
 function handleDeleteUser(data) {
   const sheet = getSheetByNameRobust('Users');
   const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h).toLowerCase().trim());
+  let archivedIdx = headers.indexOf('archived');
+  
+  if (archivedIdx === -1) {
+    archivedIdx = headers.length;
+    sheet.getRange(1, archivedIdx + 1).setValue('archived');
+  }
+
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.id).trim()) {
-      sheet.deleteRow(i + 1);
-      return jsonResponse({ success: true });
+      sheet.getRange(i + 1, archivedIdx + 1).setValue('TRUE');
+      return jsonResponse({ success: true, message: 'User archived' });
     }
   }
   return jsonResponse({ error: 'User not found' });
@@ -157,10 +165,18 @@ function handleAddProject(data) {
 function handleDeleteProject(data) {
   const sheet = getSheetByNameRobust('Projects');
   const rows = sheet.getDataRange().getValues();
+  const headers = rows[0].map(h => String(h).toLowerCase().trim());
+  let archivedIdx = headers.indexOf('archived');
+  
+  if (archivedIdx === -1) {
+    archivedIdx = headers.length;
+    sheet.getRange(1, archivedIdx + 1).setValue('archived');
+  }
+
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.id).trim()) {
-      sheet.deleteRow(i + 1);
-      return jsonResponse({ success: true });
+      sheet.getRange(i + 1, archivedIdx + 1).setValue('TRUE');
+      return jsonResponse({ success: true, message: 'Project archived' });
     }
   }
   return jsonResponse({ error: 'Project not found' });
@@ -223,9 +239,9 @@ function getSheetByNameRobust(name) {
   // Auto-create missing sheets with headers
   const newSheet = SS.insertSheet(name);
   if (target === 'users') {
-    newSheet.appendRow(['id', 'name', 'pin', 'role']);
+    newSheet.appendRow(['id', 'name', 'pin', 'role', 'archived']);
   } else if (target === 'projects') {
-    newSheet.appendRow(['id', 'name']);
+    newSheet.appendRow(['id', 'name', 'archived']);
   } else if (target === 'entries') {
     newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note']);
   } else if (target === 'corrections') {

@@ -57,11 +57,17 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
           <tbody>
             {data.users.map(u => (
               <tr key={u.id}>
-                <td>{u.name}</td><td>****</td><td>{u.role}</td>
+                <td style={{ opacity: String(u.archived).toUpperCase() === 'TRUE' ? 0.5 : 1 }}>
+                  {u.name}
+                  {String(u.archived).toUpperCase() === 'TRUE' && ' (Deleted)'}
+                </td>
+                <td>****</td><td>{u.role}</td>
                 <td>
                   <div className="flex gap-2">
                     <button className="admin-btn admin-btn-primary" onClick={() => onEdit('user', u)}><Edit size={14} /></button>
-                    <button className="admin-btn admin-btn-danger" onClick={() => onDelete('user', u.id)}><Trash2 size={14} /></button>
+                    {String(u.archived).toUpperCase() !== 'TRUE' && (
+                      <button className="admin-btn admin-btn-danger" onClick={() => onDelete('user', u.id)}><Trash2 size={14} /></button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -72,14 +78,20 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
       {adminTab === 'projects' && (
         <table className="admin-table">
           <thead>
-            <tr><th>Project Name</th><th>Actions</th></tr>
+            <tr><th>Project Name</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {data.projects.map(p => (
               <tr key={p.id}>
-                <td>{p.name}</td>
+                <td style={{ opacity: String(p.archived).toUpperCase() === 'TRUE' ? 0.5 : 1 }}>
+                  {p.name}
+                  {String(p.archived).toUpperCase() === 'TRUE' && ' (Deleted)'}
+                </td>
+                <td>{String(p.archived).toUpperCase() === 'TRUE' ? 'Archived' : 'Active'}</td>
                 <td>
-                  <button className="admin-btn admin-btn-danger" onClick={() => onDelete('project', p.id)}><Trash2 size={14} /></button>
+                  {String(p.archived).toUpperCase() !== 'TRUE' && (
+                    <button className="admin-btn admin-btn-danger" onClick={() => onDelete('project', p.id)}><Trash2 size={14} /></button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -437,7 +449,7 @@ const App = () => {
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-title">Select Project</div>
         <div className="project-list">
-          {data.projects.map(p => (
+          {data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => (
             <div key={p.id} className="project-item" onClick={() => handlePunch(p.name)}>
               {p.name}
             </div>
@@ -487,7 +499,7 @@ const App = () => {
       </div>
 
       <div className="grid">
-        {data.users.map(user => {
+        {data.users.filter(u => String(u.archived).toUpperCase() !== 'TRUE').map(user => {
           const status = getUserStatus(user.id);
           return (
             <div key={user.id} className="card" onClick={() => { setSelectedUser(user); setModalType('pin'); }}>
