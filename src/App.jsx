@@ -24,6 +24,77 @@ const getVal = (obj, ...keys) => {
   return undefined;
 };
 
+// Calculate project totals from entries
+const calculateProjectTotals = (entries, projects) => {
+  const projectTime = {};
+  const sortedEntries = [...entries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const userLastIn = {};
+
+  sortedEntries.forEach(e => {
+    const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
+    if (e.type === 'IN') {
+      userLastIn[uId] = { time: new Date(e.timestamp), project: e.project || 'No Project' };
+    } else if (e.type === 'OUT' && userLastIn[uId]) {
+      const duration = (new Date(e.timestamp) - userLastIn[uId].time) / (1000 * 60 * 60);
+      const projectName = e.project || userLastIn[uId].project || 'No Project';
+      projectTime[projectName] = (projectTime[projectName] || 0) + duration;
+      delete userLastIn[uId];
+    }
+  });
+
+  // Include all active projects even if 0 hours
+  projects.forEach(p => {
+    if (String(p.archived).toUpperCase() !== 'TRUE' && (p.status || '').toLowerCase() === 'active') {
+      if (!projectTime[p.name]) projectTime[p.name] = 0;
+    }
+  });
+
+  return Object.entries(projectTime)
+    .sort((a, b) => b[1] - a[1]) // Sort by hours descending
+    .filter(([name]) => name !== 'No Project'); // Filter out No Project from leaderboard if desired, or keep it
+};
+
+const Leaderboard = ({ entries, projects }) => {
+  const totals = calculateProjectTotals(entries, projects);
+
+  return (
+    <div className="leaderboard-container">
+      <div className="leaderboard-title">Live Leaderboard</div>
+      <table className="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th style={{ textAlign: 'right' }}>Total Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          {totals.map(([name, hours], index) => (
+            <tr key={name}>
+              <td>
+                <div className="project-name-cell">
+                  <div className="project-rank">{index + 1}</div>
+                  {name}
+                </div>
+              </td>
+              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                {hours.toFixed(2)}h
+              </td>
+            </tr>
+          ))}
+          {totals.length === 0 && (
+            <tr>
+              <td colSpan="2" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                No active project data yet
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+
 const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete, onEdit }) => (
   <div className="admin-container">
     <div className="admin-header">
@@ -81,33 +152,16 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
             <tr><th>Project Name</th><th>Total Time</th></tr>
           </thead>
           <tbody>
-            {(() => {
-              const projectTime = {};
-              const sortedEntries = [...data.entries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-              const userLastIn = {};
-
-              sortedEntries.forEach(e => {
-                const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
-                if (e.type === 'IN') {
-                  userLastIn[uId] = { time: new Date(e.timestamp), project: e.project || 'No Project' };
-                } else if (e.type === 'OUT' && userLastIn[uId]) {
-                  const duration = (new Date(e.timestamp) - userLastIn[uId].time) / (1000 * 60 * 60);
-                  const projectName = e.project || userLastIn[uId].project || 'No Project';
-                  projectTime[projectName] = (projectTime[projectName] || 0) + duration;
-                  delete userLastIn[uId];
-                }
-              });
-
-              return Object.entries(projectTime).map(([name, time]) => (
-                <tr key={name}>
-                  <td>{name}</td>
-                  <td>{time.toFixed(2)} hours</td>
-                </tr>
-              ));
-            })()}
+            {calculateProjectTotals(data.entries, data.projects).map(([name, time]) => (
+              <tr key={name}>
+                <td>{name}</td>
+                <td>{time.toFixed(2)} hours</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       )}
+
       {adminTab === 'entries' && (
         <table className="admin-table">
           <thead>
@@ -143,10 +197,27 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
   </div>
 );
 
+const HomeScreen = ({ currentTime, data, onLogin }) => (
+  <div className="flex flex-col h-full">
+    <div className="home-header">
+      <div className="clock">{format(currentTime, 'HH:mm')}</div>
+      <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
+    </div>
+
+    <Leaderboard entries={data.entries} projects={data.projects} />
+
+    <button className="btn-proceed" onClick={onLogin}>
+      Login to Clock In/Out
+    </button>
+  </div>
+);
+
+
 const App = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [data, setData] = useState({ users: [], projects: [], entries: [] });
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('home'); // 'home', 'login'
   const [selectedUser, setSelectedUser] = useState(null);
   const [pin, setPin] = useState('');
   const [showAdmin, setShowAdmin] = useState(false);
@@ -156,6 +227,7 @@ const App = () => {
   const [modalMode, setModalMode] = useState('user'); // 'user', 'admin'
   const [adminModal, setAdminModal] = useState(null); // { action: 'add'|'edit', type: 'user'|'project'|'entry', item?: any }
   const [formData, setFormData] = useState({});
+
 
   const fetchData = useCallback(async () => {
     if (!API_URL) {
@@ -427,7 +499,9 @@ const App = () => {
     setPin('');
     setModalType(null);
     setModalMode('user');
+    setView('home');
   };
+
 
   const renderPinPad = () => (
     <div className="modal-overlay animate-fade-in" onClick={resetState}>
@@ -508,35 +582,51 @@ const App = () => {
         />
       )}
 
-      <div className="home-header">
-        <div className="clock">{format(currentTime, 'HH:mm')}</div>
-        <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
-      </div>
+      {view === 'home' ? (
+        <HomeScreen
+          currentTime={currentTime}
+          data={data}
+          onLogin={() => setView('login')}
+        />
+      ) : (
+        <div className="flex flex-col h-full animate-fade-in">
+          <div className="home-header">
+            <div className="clock">{format(currentTime, 'HH:mm')}</div>
+            <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
+          </div>
 
-      <div className="grid">
-        {data.users.filter(u => String(u.archived).toUpperCase() !== 'TRUE').map(user => {
-          const status = getUserStatus(user.id);
-          return (
-            <div key={user.id} className="card" onClick={() => { setSelectedUser(user); setModalType('pin'); }}>
-              <div className={`status-dot ${status.clockedIn ? 'status-in' : 'status-out'}`} />
-              <div className="avatar">{user.name.split(' ').map(n => n[0]).join('')}</div>
-              <div className="name">{user.name}</div>
-              <button className="btn-punch">
-                {status.clockedIn ? 'Clock Out' : 'Clock In'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+          <div className="grid">
+            {data.users.filter(u => String(u.archived).toUpperCase() !== 'TRUE').map(user => {
+              const status = getUserStatus(user.id);
+              return (
+                <div key={user.id} className="card" onClick={() => { setSelectedUser(user); setModalType('pin'); }}>
+                  <div className={`status-dot ${status.clockedIn ? 'status-in' : 'status-out'}`} />
+                  <div className="avatar">{user.name.split(' ').map(n => n[0]).join('')}</div>
+                  <div className="name">{user.name}</div>
+                  <button className="btn-punch">
+                    {status.clockedIn ? 'Clock Out' : 'Clock In'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
 
-      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', padding: '0 1rem', alignItems: 'center' }}>
+          <div className="home-footer">
+            <button className="btn-back" onClick={() => setView('home')}>
+              ← Back to Leaderboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', padding: '1rem 1rem 0', alignItems: 'center' }}>
         <div className="flex gap-4">
           <History className="cursor-pointer opacity-60 hover:opacity-100" onClick={() => setShowLogs(true)} />
           <div
             className="cursor-pointer opacity-60 hover:opacity-100 flex items-center gap-1 text-xs"
             onClick={() => { setLoading(true); fetchData(); }}
           >
-            Refresh
+            Refresh Data
           </div>
         </div>
         <Settings className="cursor-pointer opacity-60 hover:opacity-100" onClick={handleAdminAuth} />
@@ -545,6 +635,7 @@ const App = () => {
       {modalType === 'pin' && renderPinPad()}
       {modalType === 'project' && renderProjectSelector()}
       {renderAdminModal()}
+
 
       {showLogs && (
         <div className="modal-overlay" onClick={() => setShowLogs(false)}>
