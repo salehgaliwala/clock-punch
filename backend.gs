@@ -59,12 +59,15 @@ function doPost(e) {
 
 function handlePunch(data) {
   const sheet = getSheetByNameRobust('Entries');
-  const timestamp = new Date().toISOString();
+  const now = new Date();
+  const tz = Session.getScriptTimeZone();
+  const timestampStr = Utilities.formatDate(now, tz, "yyyy-MM-dd HH:mm:ss");
+  const isoTimestamp = now.toISOString();
   
   // Apply 8-hour rule if it's a clock-out
   let note = '';
   if (data.type === 'OUT') {
-    note = checkLunchDeduction(data.userId, timestamp);
+    note = checkLunchDeduction(data.userId, isoTimestamp);
   }
 
   sheet.appendRow([
@@ -72,11 +75,11 @@ function handlePunch(data) {
     data.userId,
     data.project || '',
     data.type,
-    timestamp,
+    timestampStr,
     note
   ]);
   
-  return jsonResponse({ success: true, timestamp, note });
+  return jsonResponse({ success: true, timestamp: isoTimestamp, note });
 }
 
 function checkLunchDeduction(userId, outTime) {
@@ -241,7 +244,7 @@ function getSheetByNameRobust(name) {
   if (target === 'users') {
     newSheet.appendRow(['id', 'name', 'pin', 'role', 'archived']);
   } else if (target === 'projects') {
-    newSheet.appendRow(['id', 'name', 'archived']);
+    newSheet.appendRow(['id', 'name', 'status', 'archived']);
   } else if (target === 'entries') {
     newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note']);
   } else if (target === 'corrections') {
@@ -249,4 +252,54 @@ function getSheetByNameRobust(name) {
   }
   
   return newSheet;
+}
+function autoClockOutAll() {
+  const users = getSheetData('Users').filter(u => String(u.archived).toUpperCase() !== 'TRUE');
+  const entries = getSheetData('Entries');
+  const sheet = getSheetByNameRobust('Entries');
+  
+  // Set the "Automatic" time to today at 6:00 PM local time
+  const autoTime = new Date();
+  autoTime.setHours(18, 0, 0, 0);
+  const timestamp = autoTime.toISOString();
+  
+  let count = 0;
+  users.forEach(user => {
+    const status = getUserStatusForAuto(user.id, entries);
+    if (status.clockedIn) {
+      const tz = Session.getScriptTimeZone();
+      const timestampStr = Utilities.formatDate(autoTime, tz, "yyyy-MM-dd HH:mm:ss");
+      
+      sheet.appendRow([
+        Utilities.getUuid(),
+        user.id,
+        'Auto-System', // Project name for auto-outs
+        'OUT',
+        timestampStr,
+        'Automatic 6:00 PM clock-out'
+      ]);
+      count++;
+    }
+  });
+  
+  console.log(`Auto-clocked out ${count} users.`);
+  return { success: true, count };
+}
+
+/** 
+ * Helper for autoClockOutAll to determine current status without relying on React state
+ */
+function getUserStatusForAuto(userId, entries) {
+  const userEntries = entries
+    .filter(e => {
+      const uId = e.userid || e.userId || e['user id'] || e.uid;
+      return String(uId).trim() === String(userId).trim() && e.timestamp;
+    })
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  const lastEntry = userEntries[0];
+  return {
+    clockedIn: lastEntry ? lastEntry.type === 'IN' : false,
+    lastPunch: lastEntry ? lastEntry.timestamp : null
+  };
 }

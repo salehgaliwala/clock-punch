@@ -4,7 +4,7 @@ import { History, X, Settings, Shield, Plus, Edit, Trash2 } from 'lucide-react';
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbwNMsDEVgUlikuCmyLVRFfXAlk3VVX_QdtYsaiX-pYFXdT4r24xEYduMKsnyN5Bu2nKrA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxFvuqTjyj-DMrICy95fIFBIbTZUddqXQ-HJKE1GncQhqY6RNYNUqJ64nFu9brxEv5Tzw/exec';
 
 // Safely format dates to prevent app crashes on invalid data
 const safeDateFormat = (dateString, formatStr) => {
@@ -37,13 +37,13 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
     </div>
 
     <div className="admin-tabs">
-      {['users', 'projects', 'entries'].map(tab => (
+      {['users', 'entries', 'projects-report'].map(tab => (
         <div
           key={tab}
           className={`admin-tab ${adminTab === tab ? 'active' : ''}`}
           onClick={() => setAdminTab(tab)}
         >
-          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {tab === 'projects-report' ? 'Projects Report' : tab.charAt(0).toUpperCase() + tab.slice(1)}
         </div>
       ))}
     </div>
@@ -75,26 +75,36 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
           </tbody>
         </table>
       )}
-      {adminTab === 'projects' && (
+      {adminTab === 'projects-report' && (
         <table className="admin-table">
           <thead>
-            <tr><th>Project Name</th><th>Status</th><th>Actions</th></tr>
+            <tr><th>Project Name</th><th>Total Time</th></tr>
           </thead>
           <tbody>
-            {data.projects.map(p => (
-              <tr key={p.id}>
-                <td style={{ opacity: String(p.archived).toUpperCase() === 'TRUE' ? 0.5 : 1 }}>
-                  {p.name}
-                  {String(p.archived).toUpperCase() === 'TRUE' && ' (Deleted)'}
-                </td>
-                <td>{String(p.archived).toUpperCase() === 'TRUE' ? 'Archived' : 'Active'}</td>
-                <td>
-                  {String(p.archived).toUpperCase() !== 'TRUE' && (
-                    <button className="admin-btn admin-btn-danger" onClick={() => onDelete('project', p.id)}><Trash2 size={14} /></button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {(() => {
+              const projectTime = {};
+              const sortedEntries = [...data.entries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+              const userLastIn = {};
+
+              sortedEntries.forEach(e => {
+                const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
+                if (e.type === 'IN') {
+                  userLastIn[uId] = { time: new Date(e.timestamp), project: e.project || 'No Project' };
+                } else if (e.type === 'OUT' && userLastIn[uId]) {
+                  const duration = (new Date(e.timestamp) - userLastIn[uId].time) / (1000 * 60 * 60);
+                  const projectName = e.project || userLastIn[uId].project || 'No Project';
+                  projectTime[projectName] = (projectTime[projectName] || 0) + duration;
+                  delete userLastIn[uId];
+                }
+              });
+
+              return Object.entries(projectTime).map(([name, time]) => (
+                <tr key={name}>
+                  <td>{name}</td>
+                  <td>{time.toFixed(2)} hours</td>
+                </tr>
+              ));
+            })()}
           </tbody>
         </table>
       )}
@@ -121,13 +131,13 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
       )}
     </div>
 
-    {adminTab !== 'entries' && (
+    {adminTab === 'users' && (
       <button
         className="admin-btn admin-btn-primary mt-4"
         style={{ padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center', width: '100%' }}
-        onClick={() => onAdd(adminTab.slice(0, -1))}
+        onClick={() => onAdd('user')}
       >
-        <Plus size={18} /> Add New {adminTab.slice(0, -1)}
+        <Plus size={18} /> Add New User
       </button>
     )}
   </div>
@@ -376,9 +386,9 @@ const App = () => {
     if (enteredPin === (selectedUser?.pin || '').toString().trim()) {
       const status = getUserStatus(selectedUser.id);
       if (status.clockedIn) {
-        handlePunch();
+        setModalType('project'); // Select project on Clock Out
       } else {
-        setModalType('project');
+        handlePunch(); // Clock In immediately
       }
     } else {
       alert('Incorrect PIN');
@@ -447,13 +457,18 @@ const App = () => {
   const renderProjectSelector = () => (
     <div className="modal-overlay animate-fade-in" onClick={resetState}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">Select Project</div>
+        <div className="modal-title">Select Project for Clock Out</div>
         <div className="project-list">
-          {data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => (
-            <div key={p.id} className="project-item" onClick={() => handlePunch(p.name)}>
-              {p.name}
-            </div>
-          ))}
+          {data.projects
+            .filter(p =>
+              String(p.archived).toUpperCase() !== 'TRUE' &&
+              (p.status || '').toLowerCase() === 'active'
+            )
+            .map(p => (
+              <div key={p.id} className="project-item" onClick={() => handlePunch(p.name)}>
+                {p.name}
+              </div>
+            ))}
           <div className="project-item" style={{ fontStyle: 'italic' }} onClick={() => handlePunch('No Project')}>
             Skip / No Project
           </div>
