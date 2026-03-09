@@ -59,7 +59,7 @@ const Leaderboard = ({ entries, projects }) => {
 
   return (
     <div className="leaderboard-container">
-      <div className="leaderboard-title">Live Leaderboard</div>
+      <div className="leaderboard-title">Active Projects</div>
       <table className="leaderboard-table">
         <thead>
           <tr>
@@ -200,7 +200,7 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
 const HomeScreen = ({ currentTime, data, onLogin }) => (
   <div className="flex flex-col h-full">
     <div className="home-header">
-      <div className="clock">{format(currentTime, 'HH:mm')}</div>
+      <div className="clock">{format(currentTime, 'h:mm a')}</div>
       <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
     </div>
 
@@ -591,7 +591,7 @@ const App = () => {
       ) : (
         <div className="flex flex-col h-full animate-fade-in">
           <div className="home-header">
-            <div className="clock">{format(currentTime, 'HH:mm')}</div>
+            <div className="clock">{format(currentTime, 'h:mm a')}</div>
             <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
           </div>
 
