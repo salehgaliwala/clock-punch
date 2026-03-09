@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import { History, X, Settings, Shield, Plus, Edit, Trash2 } from 'lucide-react';
+import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock } from 'lucide-react';
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
@@ -207,7 +207,7 @@ const HomeScreen = ({ currentTime, data, onLogin }) => (
     <Leaderboard entries={data.entries} projects={data.projects} />
 
     <button className="btn-proceed" onClick={onLogin}>
-      Login to Clock In/Out
+      <Clock size={24} />
     </button>
   </div>
 );
