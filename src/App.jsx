@@ -49,9 +49,48 @@ const calculateProjectTotals = (entries, projects) => {
     }
   });
 
-  return Object.entries(projectTime)
+  // Handle Split Entries (assuming they are already in projectTime if they were standard)
+  // But actually, the entries logic above only handles simple 'OUT' project names.
+  // Let's refine the entries processing to handle split data.
+  const refinedProjectTime = {};
+
+  // Re-process entries for real split support
+  const userLastInRefined = {};
+  sortedEntries.forEach(e => {
+    const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
+    if (e.type === 'IN') {
+      userLastInRefined[uId] = { time: new Date(e.timestamp), project: e.project };
+    } else if (e.type === 'OUT' && userLastInRefined[uId]) {
+      const duration = (new Date(e.timestamp) - userLastInRefined[uId].time) / (1000 * 60 * 60);
+      const projectField = e.project || userLastInRefined[uId].project || 'No Project';
+
+      if (projectField.startsWith('SPLIT:')) {
+        try {
+          const splits = JSON.parse(projectField.substring(6));
+          Object.entries(splits).forEach(([proj, hours]) => {
+            refinedProjectTime[proj] = (refinedProjectTime[proj] || 0) + Number(hours);
+          });
+        } catch (err) {
+          console.error('Error parsing split project data:', err);
+          refinedProjectTime[projectField] = (refinedProjectTime[projectField] || 0) + duration;
+        }
+      } else {
+        refinedProjectTime[projectField] = (refinedProjectTime[projectField] || 0) + duration;
+      }
+      delete userLastInRefined[uId];
+    }
+  });
+
+  // Ensure active projects are present
+  projects.forEach(p => {
+    if (String(p.archived).toUpperCase() !== 'TRUE' && (p.status || '').toLowerCase() === 'active') {
+      if (!refinedProjectTime[p.name]) refinedProjectTime[p.name] = 0;
+    }
+  });
+
+  return Object.entries(refinedProjectTime)
     .sort((a, b) => b[1] - a[1]) // Sort by hours descending
-    .filter(([name]) => name !== 'No Project'); // Filter out No Project from leaderboard if desired, or keep it
+    .filter(([name]) => name !== 'No Project' && name !== 'Auto-System');
 };
 
 const Leaderboard = ({ entries, projects }) => {
@@ -173,7 +212,20 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
                 <td>{data.users.find(u => u.id == getVal(e, 'userid', 'userId', 'user id', 'uid'))?.name}</td>
                 <td style={{ color: e.type === 'IN' ? 'var(--status-in)' : 'var(--status-out)' }}>{e.type}</td>
                 <td>{safeDateFormat(e.timestamp, 'MMM d, HH:mm')}</td>
-                <td>{e.project}</td>
+                <td>
+                  {e.project?.startsWith('SPLIT:') ? (
+                    <div className="split-info">
+                      <span className="text-primary font-bold">Split Project</span>
+                      <div className="split-entry-text">
+                        {Object.entries(JSON.parse(e.project.substring(6)))
+                          .map(([p, h]) => `${p} (${Number(h).toFixed(1)}h)`)
+                          .join(', ')}
+                      </div>
+                    </div>
+                  ) : (
+                    e.project
+                  )}
+                </td>
                 <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{e.note}</td>
                 <td>
                   <button className="admin-btn admin-btn-primary" onClick={() => onEdit('entry', e)}><Edit size={14} /></button>
@@ -213,6 +265,109 @@ const HomeScreen = ({ currentTime, data, onLogin }) => (
 );
 
 
+const ClockOutPopup = ({ duration, projects, onConfirm, onClose }) => {
+  const [selected, setSelected] = useState([]);
+  const [shares, setShares] = useState({}); // {projectIndex: percentage}
+  const colors = ['#6366f1', '#10b981', '#f59e0b'];
+
+  const toggleProject = (projectName) => {
+    setSelected(prev => {
+      let next;
+      if (prev.includes(projectName)) {
+        next = prev.filter(p => p !== projectName);
+      } else if (prev.length < 3) {
+        next = [...prev, projectName];
+      } else {
+        return prev;
+      }
+
+      const newShares = {};
+      const shareVal = next.length > 0 ? (100 / next.length) : 0;
+      next.forEach((p, i) => { newShares[i] = shareVal; });
+      setShares(newShares);
+      return next;
+    });
+  };
+
+  const adjustShare = (index, delta) => {
+    setShares(prev => {
+      const next = { ...prev };
+      const otherIndices = Object.keys(prev).map(Number).filter(i => i !== index);
+      if (otherIndices.length === 0) return prev;
+      const currentVal = next[index];
+      const newVal = Math.min(100, Math.max(0, currentVal + delta));
+      const actualDelta = newVal - currentVal;
+      next[index] = newVal;
+      const shareToTake = actualDelta / otherIndices.length;
+      otherIndices.forEach(i => { next[i] = Math.max(0, next[i] - shareToTake); });
+      const total = Object.values(next).reduce((a, b) => a + b, 0);
+      if (total !== 100 && total > 0) {
+        const diff = 100 - total;
+        next[otherIndices[0]] += diff;
+      }
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    if (selected.length === 0) return alert('Select at least one project');
+    const splitData = {};
+    selected.forEach((p, i) => {
+      const hours = (shares[i] / 100) * duration;
+      splitData[p] = hours.toFixed(4);
+    });
+    onConfirm(`SPLIT:${JSON.stringify(splitData)}`);
+  };
+
+  return (
+    <div className="modal-overlay animate-fade-in" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+        <div className="modal-title">Clock Out & Allocate Time</div>
+        <div className="allocation-container">
+          <div className="allocation-summary">
+            <span style={{ fontWeight: 600 }}>Total Time:</span>
+            <span className="total-time-badge">{duration.toFixed(2)} hours</span>
+          </div>
+          <div className="visual-allocation-bar">
+            {selected.map((p, i) => (
+              <div key={p} className="allocation-segment" style={{ width: `${shares[i]}%`, background: colors[i] }}>
+                {shares[i] > 15 ? `${shares[i].toFixed(0)}%` : ''}
+              </div>
+            ))}
+          </div>
+          <div className="project-controls">
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Select up to 3 projects:</div>
+            <div className="grid" style={{ gridTemplateColumns: '1fr', maxHeight: '200px', margin: 0 }}>
+              {projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE' && (p.status || '').toLowerCase() === 'active').map(p => {
+                const isSelected = selected.includes(p.name);
+                const selIdx = selected.indexOf(p.name);
+                return (
+                  <div key={p.id} className="project-control-item" onClick={() => toggleProject(p.name)} style={{ borderColor: isSelected ? colors[selIdx] : 'var(--glass-border)', background: isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)' }}>
+                    <div className="project-color-indicator" style={{ background: isSelected ? colors[selIdx] : 'rgba(255,255,255,0.1)' }} />
+                    <div className="project-info">
+                      <span className="project-name-text">{p.name}</span>
+                      {isSelected && <span className="project-share-text">{shares[selIdx].toFixed(0)}% ({((shares[selIdx] / 100) * duration).toFixed(2)}h)</span>}
+                    </div>
+                    {isSelected && (
+                      <div className="adjustment-controls" onClick={e => e.stopPropagation()}>
+                        <button className="adjust-btn" onClick={() => adjustShare(selIdx, -5)}>−</button>
+                        <button className="adjust-btn" onClick={() => adjustShare(selIdx, 5)}>+</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <button className="btn-proceed" style={{ width: '100%', marginTop: '1rem' }} onClick={handleConfirm} disabled={selected.length === 0}>Confirm Clock Out</button>
+          <button className="btn-back" style={{ width: '100%', justifyContent: 'center' }} onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const App = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [data, setData] = useState({ users: [], projects: [], entries: [] });
@@ -227,6 +382,7 @@ const App = () => {
   const [modalMode, setModalMode] = useState('user'); // 'user', 'admin'
   const [adminModal, setAdminModal] = useState(null); // { action: 'add'|'edit', type: 'user'|'project'|'entry', item?: any }
   const [formData, setFormData] = useState({});
+  const [clockOutDuration, setClockOutDuration] = useState(0);
 
 
   const fetchData = useCallback(async () => {
@@ -458,6 +614,10 @@ const App = () => {
     if (enteredPin === (selectedUser?.pin || '').toString().trim()) {
       const status = getUserStatus(selectedUser.id);
       if (status.clockedIn) {
+        // Calculate duration since last IN
+        const lastIn = new Date(status.lastPunch);
+        const duration = (new Date() - lastIn) / (1000 * 60 * 60);
+        setClockOutDuration(duration > 0 ? duration : 0);
         setModalType('project'); // Select project on Clock Out
       } else {
         handlePunch(); // Clock In immediately
@@ -503,6 +663,7 @@ const App = () => {
   };
 
 
+
   const renderPinPad = () => (
     <div className="modal-overlay animate-fade-in" onClick={resetState}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -529,26 +690,12 @@ const App = () => {
   );
 
   const renderProjectSelector = () => (
-    <div className="modal-overlay animate-fade-in" onClick={resetState}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">Select Project for Clock Out</div>
-        <div className="project-list">
-          {data.projects
-            .filter(p =>
-              String(p.archived).toUpperCase() !== 'TRUE' &&
-              (p.status || '').toLowerCase() === 'active'
-            )
-            .map(p => (
-              <div key={p.id} className="project-item" onClick={() => handlePunch(p.name)}>
-                {p.name}
-              </div>
-            ))}
-          <div className="project-item" style={{ fontStyle: 'italic' }} onClick={() => handlePunch('No Project')}>
-            Skip / No Project
-          </div>
-        </div>
-      </div>
-    </div>
+    <ClockOutPopup
+      duration={clockOutDuration}
+      projects={data.projects}
+      onConfirm={(p) => handlePunch(p)}
+      onClose={resetState}
+    />
   );
 
   if (loading && data.users.length === 0) {
