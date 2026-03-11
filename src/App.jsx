@@ -4,7 +4,7 @@ import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock } from 'lucide-
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbwI9QIeUJDoB3eqogyy_xGjJsXiaNskhwaEkVkF6fqv8cQfCFx3Gd6PO6ZTqAWXPxy5ig/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbz-VNsmotfrgit45GNMJKKXBaASpCgseRr8Z48C6BCu0fkftiYmC2gIQ7HzNpxIEKdn8g/exec';
 
 // Safely format dates to prevent app crashes on invalid data
 const safeDateFormat = (dateString, formatStr) => {
