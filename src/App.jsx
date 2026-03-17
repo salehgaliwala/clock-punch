@@ -99,36 +99,38 @@ const Leaderboard = ({ entries, projects }) => {
   return (
     <div className="leaderboard-container">
       <div className="leaderboard-title">Active Projects</div>
-      <table className="leaderboard-table">
-        <thead>
-          <tr>
-            <th>Project</th>
-            <th style={{ textAlign: 'right' }}>Total Hours</th>
-          </tr>
-        </thead>
-        <tbody>
-          {totals.map(([name, hours], index) => (
-            <tr key={name}>
-              <td>
-                <div className="project-name-cell">
-                  <div className="project-rank">{index + 1}</div>
-                  {name}
-                </div>
-              </td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                {hours.toFixed(2)}h
-              </td>
-            </tr>
-          ))}
-          {totals.length === 0 && (
+      <div className="leaderboard-table-wrapper">
+        <table className="leaderboard-table">
+          <thead>
             <tr>
-              <td colSpan="2" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                No active project data yet
-              </td>
+              <th>Project</th>
+              <th style={{ textAlign: 'right' }}>Total Hours</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {totals.map(([name, hours], index) => (
+              <tr key={name}>
+                <td>
+                  <div className="project-name-cell">
+                    <div className="project-rank">{index + 1}</div>
+                    {name}
+                  </div>
+                </td>
+                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                  {hours.toFixed(2)}h
+                </td>
+              </tr>
+            ))}
+            {totals.length === 0 && (
+              <tr>
+                <td colSpan="2" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                  No active project data yet
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

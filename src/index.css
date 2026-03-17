@@ -88,12 +88,16 @@ body {
 
 /* Custom Scrollbar */
 .grid::-webkit-scrollbar,
-.admin-container::-webkit-scrollbar {
+.admin-container::-webkit-scrollbar,
+.leaderboard-table-wrapper::-webkit-scrollbar,
+.allocation-container::-webkit-scrollbar {
   width: 6px;
 }
 
 .grid::-webkit-scrollbar-thumb,
-.admin-container::-webkit-scrollbar-thumb {
+.admin-container::-webkit-scrollbar-thumb,
+.leaderboard-table-wrapper::-webkit-scrollbar-thumb,
+.allocation-container::-webkit-scrollbar-thumb {
   background: var(--glass-border);
   border-radius: 10px;
 }
@@ -454,12 +458,21 @@ body {
 .leaderboard-container {
   flex: 1;
   width: 100%;
-  overflow-y: auto;
   margin: 1.5rem 0;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 24px;
   border: 1px solid var(--glass-border);
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.leaderboard-table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  max-height: 350px;
 }
 
 .leaderboard-title {
@@ -484,6 +497,11 @@ body {
   text-transform: uppercase;
   padding: 0.75rem;
   border-bottom: 1px solid var(--glass-border);
+  position: sticky;
+  top: 0;
+  background: #1e1b4b;
+  /* Opaque background to cover scrolling content */
+  z-index: 10;
 }
 
 .leaderboard-table td {
