@@ -81,16 +81,18 @@ const calculateProjectTotals = (entries, projects) => {
     }
   });
 
-  // Ensure active projects are present
-  projects.forEach(p => {
-    if (String(p.archived).toUpperCase() !== 'TRUE' && (p.status || '').toLowerCase() === 'active') {
-      if (!refinedProjectTime[p.name]) refinedProjectTime[p.name] = 0;
-    }
+  const activeProjectNames = projects
+    .filter(p => String(p.archived).toUpperCase() !== 'TRUE' && (p.status || '').toLowerCase() === 'active')
+    .map(p => p.name);
+
+  // Initialize all active projects with 0 hours if not present
+  activeProjectNames.forEach(name => {
+    if (!refinedProjectTime[name]) refinedProjectTime[name] = 0;
   });
 
   return Object.entries(refinedProjectTime)
-    .sort((a, b) => b[1] - a[1]) // Sort by hours descending
-    .filter(([name]) => name !== 'No Project' && name !== 'Auto-System');
+    .filter(([name]) => activeProjectNames.includes(name))
+    .sort((a, b) => b[1] - a[1]); // Sort by hours descending
 };
 
 const Leaderboard = ({ entries, projects }) => {
