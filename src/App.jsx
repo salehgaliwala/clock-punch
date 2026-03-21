@@ -293,21 +293,25 @@ const ClockOutPopup = ({ duration, projects, onConfirm, onClose }) => {
     });
   };
 
-  const adjustShare = (index, delta) => {
+  const updateShare = (index, newValue) => {
     setShares(prev => {
       const next = { ...prev };
       const otherIndices = Object.keys(prev).map(Number).filter(i => i !== index);
-      if (otherIndices.length === 0) return prev;
-      const currentVal = next[index];
-      const newVal = Math.min(100, Math.max(0, currentVal + delta));
-      const actualDelta = newVal - currentVal;
+      if (otherIndices.length === 0) return { ...prev, [index]: 100 };
+
+      const newVal = Math.min(100, Math.max(0, Number(newValue) || 0));
+      const actualDelta = newVal - (next[index] || 0);
       next[index] = newVal;
+
       const shareToTake = actualDelta / otherIndices.length;
-      otherIndices.forEach(i => { next[i] = Math.max(0, next[i] - shareToTake); });
+      otherIndices.forEach(i => {
+        next[i] = Math.max(0, (next[i] || 0) - shareToTake);
+      });
+
       const total = Object.values(next).reduce((a, b) => a + b, 0);
       if (total !== 100 && total > 0) {
         const diff = 100 - total;
-        next[otherIndices[0]] += diff;
+        next[otherIndices[0]] = Math.max(0, next[otherIndices[0]] + diff);
       }
       return next;
     });
@@ -350,12 +354,19 @@ const ClockOutPopup = ({ duration, projects, onConfirm, onClose }) => {
                     <div className="project-color-indicator" style={{ background: isSelected ? colors[selIdx] : 'rgba(255,255,255,0.1)' }} />
                     <div className="project-info">
                       <span className="project-name-text">{p.name}</span>
-                      {isSelected && <span className="project-share-text">{shares[selIdx].toFixed(0)}% ({((shares[selIdx] / 100) * duration).toFixed(2)}h)</span>}
+                      {isSelected && <span className="project-share-text">{((shares[selIdx] / 100) * duration).toFixed(2)}h total</span>}
                     </div>
                     {isSelected && (
                       <div className="adjustment-controls" onClick={e => e.stopPropagation()}>
-                        <button className="adjust-btn" onClick={() => adjustShare(selIdx, -5)}>−</button>
-                        <button className="adjust-btn" onClick={() => adjustShare(selIdx, 5)}>+</button>
+                        <input
+                          type="number"
+                          className="percent-input"
+                          value={Math.round(shares[selIdx])}
+                          onChange={(e) => updateShare(selIdx, e.target.value)}
+                          min="0"
+                          max="100"
+                        />
+                        <span className="percent-symbol">%</span>
                       </div>
                     )}
                   </div>
@@ -435,7 +446,8 @@ const App = () => {
           action: 'punch',
           userId: selectedUser.id,
           project,
-          type
+          type,
+          sessionId: userStatus.lastInId
         })
       });
       const resJson = await resp.json();
@@ -654,7 +666,8 @@ const App = () => {
     const lastEntry = userEntries[0];
     return {
       clockedIn: lastEntry ? lastEntry.type === 'IN' : false,
-      lastPunch: lastEntry ? lastEntry.timestamp : null
+      lastPunch: lastEntry ? lastEntry.timestamp : null,
+      lastInId: (lastEntry && lastEntry.type === 'IN') ? (lastEntry.sessionid || lastEntry.id) : null
     };
   };
 

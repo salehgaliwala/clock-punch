@@ -70,13 +70,17 @@ function handlePunch(data) {
     note = checkLunchDeduction(data.userId, isoTimestamp);
   }
 
+  const entryId = Utilities.getUuid();
+  const sessionId = data.sessionId || entryId;
+  
   sheet.appendRow([
-    Utilities.getUuid(),
+    entryId,
     data.userId,
     data.project || '',
     data.type,
     timestampStr,
-    note
+    note,
+    sessionId
   ]);
   
   return jsonResponse({ success: true, timestamp: isoTimestamp, note });
@@ -246,7 +250,7 @@ function getSheetByNameRobust(name) {
   } else if (target === 'projects') {
     newSheet.appendRow(['id', 'name', 'status', 'archived']);
   } else if (target === 'entries') {
-    newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note']);
+    newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note', 'sessionid']);
   } else if (target === 'corrections') {
     newSheet.appendRow(['id', 'entryId', 'oldTimestamp', 'newTimestamp', 'adminId', 'reason']);
   }
