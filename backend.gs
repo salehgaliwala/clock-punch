@@ -73,6 +73,18 @@ function handlePunch(data) {
   const entryId = Utilities.getUuid();
   const sessionId = data.sessionId || entryId;
   
+  let splits = '';
+  if (data.project && data.project.startsWith('SPLIT:')) {
+    try {
+      const splitObj = JSON.parse(data.project.substring(6));
+      splits = Object.entries(splitObj)
+        .map(([p, h]) => `${p} (${Number(h).toFixed(2)}h)`)
+        .join(', ');
+    } catch (e) {
+      splits = 'Error parsing split data';
+    }
+  }
+
   sheet.appendRow([
     entryId,
     data.userId,
@@ -80,7 +92,8 @@ function handlePunch(data) {
     data.type,
     timestampStr,
     note,
-    sessionId
+    sessionId,
+    splits
   ]);
   
   return jsonResponse({ success: true, timestamp: isoTimestamp, note });
@@ -250,7 +263,7 @@ function getSheetByNameRobust(name) {
   } else if (target === 'projects') {
     newSheet.appendRow(['id', 'name', 'status', 'archived']);
   } else if (target === 'entries') {
-    newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note', 'sessionid']);
+    newSheet.appendRow(['id', 'userid', 'project', 'type', 'timestamp', 'note', 'sessionid', 'splits']);
   } else if (target === 'corrections') {
     newSheet.appendRow(['id', 'entryId', 'oldTimestamp', 'newTimestamp', 'adminId', 'reason']);
   }
@@ -262,17 +275,18 @@ function autoClockOutAll() {
   const entries = getSheetData('Entries');
   const sheet = getSheetByNameRobust('Entries');
   
-  // Set the "Automatic" time to today at 6:00 PM local time
-  const autoTime = new Date();
-  autoTime.setHours(18, 0, 0, 0);
-  const timestamp = autoTime.toISOString();
-  
   let count = 0;
   users.forEach(user => {
     const status = getUserStatusForAuto(user.id, entries);
-    if (status.clockedIn) {
+    if (status.clockedIn && status.lastPunch) {
       const tz = Session.getScriptTimeZone();
-      const timestampStr = Utilities.formatDate(autoTime, tz, "yyyy-MM-dd HH:mm:ss");
+      const lastIn = new Date(status.lastPunch);
+      
+      // Use the same day as the clock-in, but at 6:00 PM
+      const autoOutTime = new Date(lastIn.getTime());
+      autoOutTime.setHours(18, 0, 0, 0);
+      
+      const timestampStr = Utilities.formatDate(autoOutTime, tz, "yyyy-MM-dd HH:mm:ss");
       
       sheet.appendRow([
         Utilities.getUuid(),
@@ -280,7 +294,9 @@ function autoClockOutAll() {
         'Auto-System', // Project name for auto-outs
         'OUT',
         timestampStr,
-        'Automatic 6:00 PM clock-out'
+        'Automatic 6:00 PM clock-out',
+        status.lastInId || '', // Session ID
+        '' // Splits (empty for auto)
       ]);
       count++;
     }
@@ -304,6 +320,7 @@ function getUserStatusForAuto(userId, entries) {
   const lastEntry = userEntries[0];
   return {
     clockedIn: lastEntry ? lastEntry.type === 'IN' : false,
-    lastPunch: lastEntry ? lastEntry.timestamp : null
+    lastPunch: lastEntry ? lastEntry.timestamp : null,
+    lastInId: (lastEntry && lastEntry.type === 'IN') ? (lastEntry.sessionid || lastEntry.id) : null
   };
 }

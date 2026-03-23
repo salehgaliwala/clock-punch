@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock } from 'lucide-react';
+import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock, Minus } from 'lucide-react';
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbyLmq8kpVbJFzG70NbojSFjq5qM3fwzDmvrCwDtvstqO1f5olzDpZBZpDaogQXxtUGTbg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxq_vDFgd9V7DbUbH6vptAMZaI20O4TX-ps4jl6b22i6tJOaEDI2Ed7pQzrKeekEqdmig/exec';
 
 // Safely format dates to prevent app crashes on invalid data
 const safeDateFormat = (dateString, formatStr) => {
@@ -358,6 +358,12 @@ const ClockOutPopup = ({ duration, projects, onConfirm, onClose }) => {
                     </div>
                     {isSelected && (
                       <div className="adjustment-controls" onClick={e => e.stopPropagation()}>
+                        <button
+                          className="adjust-btn"
+                          onClick={() => updateShare(selIdx, (shares[selIdx] || 0) - 5)}
+                        >
+                          <Minus size={14} />
+                        </button>
                         <input
                           type="number"
                           className="percent-input"
@@ -366,6 +372,12 @@ const ClockOutPopup = ({ duration, projects, onConfirm, onClose }) => {
                           min="0"
                           max="100"
                         />
+                        <button
+                          className="adjust-btn"
+                          onClick={() => updateShare(selIdx, (shares[selIdx] || 0) + 5)}
+                        >
+                          <Plus size={14} />
+                        </button>
                         <span className="percent-symbol">%</span>
                       </div>
                     )}
