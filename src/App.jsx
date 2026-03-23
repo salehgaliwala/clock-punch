@@ -4,7 +4,7 @@ import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock, Minus } from '
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbxq_vDFgd9V7DbUbH6vptAMZaI20O4TX-ps4jl6b22i6tJOaEDI2Ed7pQzrKeekEqdmig/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxi8RgNvVDDCeu2LzuUWCFRcPCswHjy6aJ7NkMN0eGzHnA9K0Pr59eY3SEaAHl7zxLR/exec';
 
 // Safely format dates to prevent app crashes on invalid data
 const safeDateFormat = (dateString, formatStr) => {
