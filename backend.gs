@@ -77,8 +77,12 @@ function handlePunch(data) {
   if (data.project && data.project.startsWith('SPLIT:')) {
     try {
       const splitObj = JSON.parse(data.project.substring(6));
+      const totalHours = Object.values(splitObj).reduce((sum, h) => sum + Number(h), 0);
       splits = Object.entries(splitObj)
-        .map(([p, h]) => `${p} (${Number(h).toFixed(2)}h)`)
+        .map(([p, h]) => {
+          const pct = totalHours > 0 ? (Number(h) / totalHours) * 100 : 0;
+          return `${p} (${pct.toFixed(0)}%)`;
+        })
         .join(', ');
     } catch (e) {
       splits = 'Error parsing split data';
