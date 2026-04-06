@@ -255,16 +255,17 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
 
 const HomeScreen = ({ currentTime, data, onLogin }) => (
   <div className="flex flex-col h-full">
-    <div className="home-header">
-      <div className="clock">{format(currentTime, 'h:mm a')}</div>
-      <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
+    <div className="home-header home-header-main">
+      <div className="header-left">
+        <div className="clock">{format(currentTime, 'h:mm a')}</div>
+        <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
+      </div>
+      <button className="btn-proceed" onClick={onLogin}>
+        <Clock size={24} />
+      </button>
     </div>
 
     <Leaderboard entries={data.entries} projects={data.projects} />
-
-    <button className="btn-proceed" onClick={onLogin}>
-      <Clock size={24} />
-    </button>
   </div>
 );
 
@@ -445,18 +446,21 @@ const App = () => {
     return () => clearInterval(timer);
   }, [fetchData]);
 
-  const handlePunch = async (project = '') => {
-    const userStatus = getUserStatus(selectedUser.id);
+  const handlePunch = useCallback(async (project = '', userOverride = null) => {
+    const user = userOverride || selectedUser;
+    if (!user) return;
+
+    const userStatus = getUserStatus(user.id);
     const type = userStatus.clockedIn ? 'OUT' : 'IN';
 
     try {
       setLoading(true);
-      console.log('Sending punch:', { action: 'punch', userId: selectedUser.id, project, type });
+      console.log('Sending punch:', { action: 'punch', userId: user.id, project, type });
       const resp = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'punch',
-          userId: selectedUser.id,
+          userId: user.id,
           project,
           type,
           sessionId: userStatus.lastInId
@@ -477,7 +481,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedUser, fetchData, getUserStatus, resetState]);
 
   const handleAdd = (type) => {
     setAdminModal({ action: 'add', type });
@@ -618,8 +622,10 @@ const App = () => {
     );
   };
 
-  const handlePinSubmit = () => {
+  const handlePinSubmit = useCallback(() => {
     const enteredPin = pin.toString().trim();
+    const currentUser = selectedUser; // Capture currently selected user
+    setPin(''); // Clear PIN immediately
 
     if (modalMode === 'admin') {
       const admin = data.users.find(u => {
@@ -633,14 +639,13 @@ const App = () => {
         resetState();
       } else {
         alert('Unauthorized Admin PIN');
-        setPin('');
       }
       return;
     }
 
     // User Login
-    if (enteredPin === (selectedUser?.pin || '').toString().trim()) {
-      const status = getUserStatus(selectedUser.id);
+    if (currentUser && enteredPin === (currentUser.pin || '').toString().trim()) {
+      const status = getUserStatus(currentUser.id);
       if (status.clockedIn) {
         // Calculate duration since last IN
         const lastIn = new Date(status.lastPunch);
@@ -648,20 +653,19 @@ const App = () => {
         setClockOutDuration(duration > 0 ? duration : 0);
         setModalType('project'); // Select project on Clock Out
       } else {
-        handlePunch(); // Clock In immediately
+        handlePunch('', currentUser); // Clock In immediately, pass currentUser directly
       }
     } else {
       alert('Incorrect PIN');
-      setPin('');
     }
-  };
+  }, [pin, modalMode, data.users, selectedUser, handlePunch, getUserStatus, resetState]);
 
   const handleAdminAuth = () => {
     setModalMode('admin');
     setModalType('pin');
   };
 
-  const getUserStatus = (userId) => {
+  const getUserStatus = useCallback((userId) => {
     const userEntries = data.entries
       .filter(e => {
         const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
@@ -681,15 +685,21 @@ const App = () => {
       lastPunch: lastEntry ? lastEntry.timestamp : null,
       lastInId: (lastEntry && lastEntry.type === 'IN') ? (lastEntry.sessionid || lastEntry.id) : null
     };
-  };
+  }, [data.entries]);
 
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setSelectedUser(null);
     setPin('');
     setModalType(null);
     setModalMode('user');
     setView('home');
-  };
+  }, []);
+
+  useEffect(() => {
+    if (pin.length === 4) {
+      handlePinSubmit();
+    }
+  }, [pin, handlePinSubmit]);
 
 
 
@@ -710,9 +720,9 @@ const App = () => {
               {num}
             </button>
           ))}
-          <button className="pin-btn" style={{ color: 'var(--status-out)' }} onClick={() => setPin('')}>C</button>
+          <div />
           <button className="pin-btn" onClick={() => pin.length < 4 && setPin(pin + '0')}>0</button>
-          <button className="pin-btn" style={{ color: 'var(--status-in)' }} onClick={handlePinSubmit}>OK</button>
+          <div />
         </div>
       </div>
     </div>
