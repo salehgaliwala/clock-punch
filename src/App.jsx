@@ -446,6 +446,36 @@ const App = () => {
     return () => clearInterval(timer);
   }, [fetchData]);
 
+  const getUserStatus = useCallback((userId) => {
+    const userEntries = data.entries
+      .filter(e => {
+        const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
+        return uId == userId && e.timestamp; // Only consider entries with timestamps
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+        const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+        const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+        return timeB - timeA;
+      });
+
+    const lastEntry = userEntries[0];
+    return {
+      clockedIn: lastEntry ? lastEntry.type === 'IN' : false,
+      lastPunch: lastEntry ? lastEntry.timestamp : null,
+      lastInId: (lastEntry && lastEntry.type === 'IN') ? (lastEntry.sessionid || lastEntry.id) : null
+    };
+  }, [data.entries]);
+
+  const resetState = useCallback(() => {
+    setSelectedUser(null);
+    setPin('');
+    setModalType(null);
+    setModalMode('user');
+    setView('home');
+  }, []);
+
   const handlePunch = useCallback(async (project = '', userOverride = null) => {
     const user = userOverride || selectedUser;
     if (!user) return;
@@ -665,35 +695,6 @@ const App = () => {
     setModalType('pin');
   };
 
-  const getUserStatus = useCallback((userId) => {
-    const userEntries = data.entries
-      .filter(e => {
-        const uId = getVal(e, 'userid', 'userId', 'user id', 'uid');
-        return uId == userId && e.timestamp; // Only consider entries with timestamps
-      })
-      .sort((a, b) => {
-        const dateA = new Date(a.timestamp);
-        const dateB = new Date(b.timestamp);
-        const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
-        const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
-        return timeB - timeA;
-      });
-
-    const lastEntry = userEntries[0];
-    return {
-      clockedIn: lastEntry ? lastEntry.type === 'IN' : false,
-      lastPunch: lastEntry ? lastEntry.timestamp : null,
-      lastInId: (lastEntry && lastEntry.type === 'IN') ? (lastEntry.sessionid || lastEntry.id) : null
-    };
-  }, [data.entries]);
-
-  const resetState = useCallback(() => {
-    setSelectedUser(null);
-    setPin('');
-    setModalType(null);
-    setModalMode('user');
-    setView('home');
-  }, []);
 
   useEffect(() => {
     if (pin.length === 4) {

@@ -62,17 +62,23 @@ body {
 }
 
 .clock {
-  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  font-size: 1.25rem;
   font-weight: 700;
-  letter-spacing: -2px;
-  margin-bottom: 0.25rem;
+  letter-spacing: -1px;
+  margin-bottom: 0.1rem;
+  text-align: left;
 }
 
 .date {
-  font-size: 1.1rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.pin-btn-spacer {
+  visibility: hidden;
+  padding: 1.5rem;
 }
 
 .grid {
@@ -293,9 +299,10 @@ body {
 
 .home-header-main {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  text-align: left;
+  gap: 2rem;
+  margin-bottom: 2rem;
 }
 
 .admin-tabs {
