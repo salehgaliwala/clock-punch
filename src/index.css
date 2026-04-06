@@ -62,10 +62,10 @@ body {
 }
 
 .clock {
-  font-size: clamp(3rem, 10vw, 5rem);
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
   font-weight: 700;
   letter-spacing: -2px;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .date {
@@ -289,6 +289,13 @@ body {
   align-items: center;
   margin-bottom: 2rem;
   flex-shrink: 0;
+}
+
+.home-header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
 }
 
 .admin-tabs {
@@ -549,9 +556,7 @@ body {
 }
 
 .btn-proceed {
-  width: 50%;
-  margin: auto auto 0 auto;
-  padding: 1.25rem;
+  padding: 1rem 2rem;
   background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
   color: white;
   border: none;
