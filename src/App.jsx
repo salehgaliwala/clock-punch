@@ -95,27 +95,13 @@ const calculateProjectTotals = (entries, projects) => {
     .sort((a, b) => b[1] - a[1]); // Sort by hours descending
 };
 
-const Leaderboard = ({ entries, projects, clockedInUsers = [] }) => {
+const Leaderboard = ({ entries, projects }) => {
   const totals = calculateProjectTotals(entries, projects);
 
   return (
     <div className="leaderboard-container">
       <div className="leaderboard-header-row">
         <div className="leaderboard-title">Active Projects</div>
-        {clockedInUsers.length > 0 && (
-          <div className="logged-in-indicators">
-            {clockedInUsers.slice(0, 6).map(user => (
-              <div key={user.id} className="indicator-avatar" title={user.name}>
-                {user.name.split(' ').map(n => n[0]).join('')}
-              </div>
-            ))}
-            {clockedInUsers.length > 6 && (
-              <div className="indicator-more">
-                +{clockedInUsers.length - 6}
-              </div>
-            )}
-          </div>
-        )}
       </div>
       <div className="leaderboard-table-wrapper">
         <table className="leaderboard-table">
@@ -277,13 +263,32 @@ const HomeScreen = ({ currentTime, data, onLogin, clockedInUsers = [] }) => (
         <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
       </div>
       <div className="flex items-center gap-4">
-        <button className="btn-proceed" onClick={onLogin}>
-          <Clock size={24} />
-        </button>
+        <div className="login-btn-container">
+          <button className="btn-proceed" onClick={onLogin}>
+            <Clock size={24} />
+          </button>
+          {clockedInUsers.length > 0 && (
+            <div className="logged-in-indicators indicators-absolute">
+              {clockedInUsers.slice(0, 6).map(user => {
+                const initials = user.name ? user.name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase() : '?';
+                return (
+                  <div key={user.id} className="indicator-avatar" title={user.name}>
+                    {initials.substring(0, 2)}
+                  </div>
+                );
+              })}
+              {clockedInUsers.length > 6 && (
+                <div className="indicator-more">
+                  +{clockedInUsers.length - 6}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
 
-    <Leaderboard entries={data.entries} projects={data.projects} clockedInUsers={clockedInUsers} />
+    <Leaderboard entries={data.entries} projects={data.projects} />
   </div>
 );
 
@@ -990,10 +995,11 @@ const App = () => {
           <div className="grid">
             {data.users.filter(u => String(u.archived).toUpperCase() !== 'TRUE').map(user => {
               const status = getUserStatus(user.id);
+              const initials = user.name ? user.name.trim().split(/\s+/).map(n => n[0]).join('').toUpperCase() : '?';
               return (
                 <div key={user.id} className="card" onClick={() => { setSelectedUser(user); setModalType('pin'); }}>
                   <div className={`status-dot ${status.clockedIn ? 'status-in' : 'status-out'}`} />
-                  <div className="avatar">{user.name.split(' ').map(n => n[0]).join('')}</div>
+                  <div className="avatar">{initials.substring(0, 2)}</div>
                   <div className="name">{user.name}</div>
                   <button className="btn-punch">
                     {status.clockedIn ? 'Clock Out' : 'Clock In'}
@@ -1037,16 +1043,29 @@ const App = () => {
               <X onClick={() => setShowLogs(false)} className="cursor-pointer" />
             </div>
             <div className="project-list">
-              {data.entries.slice(-20).reverse().map((log, i) => (
-                <div key={i} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '0.8rem' }}>
-                  <span style={{ color: log.type === 'IN' ? 'var(--status-in)' : 'var(--status-out)', fontWeight: 'bold' }}>{log.type}</span>
-                  {' - '}{data.users.find(u => u.id == getVal(log, 'userid', 'userId', 'user id', 'uid'))?.name}
-                  <div style={{ color: 'var(--text-muted)' }}>
-                    {safeDateFormat(log.timestamp, 'MMM d, HH:mm:ss')}
-                    {log.project && ` • ${log.project.startsWith("SPLIT:") ? Object.entries(JSON.parse(log.project.substring(6))).map(([p, h]) => `${p} (${h}h)`).join(", ") : log.project}`}
+              {data.entries.slice(-20).reverse().map((log, i) => {
+                let projectText = log.project;
+                if (log.project && log.project.startsWith("SPLIT:")) {
+                  try {
+                    const splitData = JSON.parse(log.project.substring(6));
+                    projectText = Object.entries(splitData)
+                      .map(([p, h]) => `${p} (${Number(h).toFixed(1)}h)`)
+                      .join(", ");
+                  } catch {
+                    projectText = "Invalid split data";
+                  }
+                }
+                return (
+                  <div key={i} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                    <span style={{ color: log.type === 'IN' ? 'var(--status-in)' : 'var(--status-out)', fontWeight: 'bold' }}>{log.type}</span>
+                    {' - '}{data.users.find(u => u.id == getVal(log, 'userid', 'userId', 'user id', 'uid'))?.name}
+                    <div style={{ color: 'var(--text-muted)' }}>
+                      {safeDateFormat(log.timestamp, 'MMM d, HH:mm:ss')}
+                      {projectText && ` • ${projectText}`}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
