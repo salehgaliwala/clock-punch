@@ -224,7 +224,7 @@ function handleEditEntry(data) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.entryId).trim()) {
       sheet.getRange(i + 1, 5).setValue(data.newTimestamp);
-      sheet.getRange(i + 1, 6).setValue('Edited by Admin: ' + data.reason);
+      sheet.getRange(i + 1, 6).setValue(data.reason);
       if (data.project !== undefined) {
         sheet.getRange(i + 1, 3).setValue(data.project);
       }
