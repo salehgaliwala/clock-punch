@@ -4,7 +4,7 @@ import { History, X, Settings, Shield, Plus, Edit, Trash2, Clock, Minus } from '
 import './index.css';
 
 // CONFIG: Replace this with your deployed Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbxi8RgNvVDDCeu2LzuUWCFRcPCswHjy6aJ7NkMN0eGzHnA9K0Pr59eY3SEaAHl7zxLR/exec';
+const API_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
 
 // Safely format dates to prevent app crashes on invalid data
 const safeDateFormat = (dateString, formatStr) => {
@@ -430,14 +430,17 @@ const App = () => {
 
 
   const fetchData = useCallback(async () => {
-    if (!API_URL) {
+    if (!API_URL || API_URL.includes('YOUR_SCRIPT_ID')) {
       console.warn('API URL not set. Using mock data.');
       setData({
         users: [
           { id: '1', name: 'Alice Admin', pin: '1234', role: 'Admin' },
-          { id: '2', name: 'Bob User', pin: '0000', role: 'User' }
+          { id: '2', name: 'Bob Employee', pin: '0000', role: 'User' }
         ],
-        projects: [{ id: '1', name: 'Internal Dev' }],
+        projects: [
+          { id: '1', name: 'Project A', status: 'active' },
+          { id: '2', name: 'Project B', status: 'active' }
+        ],
         entries: []
       });
       setLoading(false);
@@ -461,6 +464,37 @@ const App = () => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // Sync duration and splits when admin edits timestamp
+  useEffect(() => {
+    if (adminModal?.type === 'entry' && adminModal?.action === 'edit' && adminModal?.item?.type === 'OUT') {
+      const inEntry = data.entries.find(e => e.type === 'IN' && (e.sessionid === adminModal.item.sessionid || e.id === adminModal.item.sessionid));
+      if (inEntry) {
+        const dateOut = new Date(formData.timestamp);
+        const dateIn = new Date(inEntry.timestamp);
+        if (!isNaN(dateOut.getTime()) && !isNaN(dateIn.getTime())) {
+          const newDuration = (dateOut - dateIn) / (1000 * 60 * 60);
+          if (newDuration !== formData.duration && newDuration >= 0) {
+            setFormData(prev => {
+              let newProject = prev.project;
+              if (prev.project?.startsWith('SPLIT:')) {
+                try {
+                  const splitData = JSON.parse(prev.project.substring(6));
+                  const newSplitData = {};
+                  Object.entries(splitData).forEach(([p, h]) => {
+                    const share = Number(h) / (prev.duration || 1);
+                    newSplitData[p] = (share * newDuration).toFixed(4);
+                  });
+                  newProject = `SPLIT:${JSON.stringify(newSplitData)}`;
+                } catch (e) { console.error('Recalculate error:', e); }
+              }
+              return { ...prev, duration: newDuration, project: newProject };
+            });
+          }
+        }
+      }
+    }
+  }, [formData.timestamp, adminModal, data.entries, formData.duration]);
 
   const getUserStatus = useCallback((userId) => {
     const userEntries = data.entries
@@ -1005,7 +1039,7 @@ const App = () => {
                   {' - '}{data.users.find(u => u.id == getVal(log, 'userid', 'userId', 'user id', 'uid'))?.name}
                   <div style={{ color: 'var(--text-muted)' }}>
                     {safeDateFormat(log.timestamp, 'MMM d, HH:mm:ss')}
-                    {log.project && ` • ${log.project}`}
+                    {log.project && ` • ${log.project.startsWith("SPLIT:") ? Object.entries(JSON.parse(log.project.substring(6))).map(([p, h]) => `${p} (${h}h)`).join(", ") : log.project}`}
                   </div>
                 </div>
               ))}
