@@ -489,11 +489,16 @@ body {
   max-height: 500px;
 }
 
+.leaderboard-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
 .leaderboard-title {
   font-size: 1.25rem;
   font-weight: 700;
-  margin-bottom: 1rem;
-  text-align: center;
   color: var(--primary);
   text-transform: uppercase;
   letter-spacing: 2px;
@@ -848,7 +853,6 @@ body {
 .logged-in-indicators {
   display: flex;
   align-items: center;
-  margin-right: 0.5rem;
 }
 
 .indicator-avatar {

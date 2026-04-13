@@ -95,12 +95,28 @@ const calculateProjectTotals = (entries, projects) => {
     .sort((a, b) => b[1] - a[1]); // Sort by hours descending
 };
 
-const Leaderboard = ({ entries, projects }) => {
+const Leaderboard = ({ entries, projects, clockedInUsers = [] }) => {
   const totals = calculateProjectTotals(entries, projects);
 
   return (
     <div className="leaderboard-container">
-      <div className="leaderboard-title">Active Projects</div>
+      <div className="leaderboard-header-row">
+        <div className="leaderboard-title">Active Projects</div>
+        {clockedInUsers.length > 0 && (
+          <div className="logged-in-indicators">
+            {clockedInUsers.slice(0, 6).map(user => (
+              <div key={user.id} className="indicator-avatar" title={user.name}>
+                {user.name.split(' ').map(n => n[0]).join('')}
+              </div>
+            ))}
+            {clockedInUsers.length > 6 && (
+              <div className="indicator-more">
+                +{clockedInUsers.length - 6}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div className="leaderboard-table-wrapper">
         <table className="leaderboard-table">
           <thead>
@@ -261,27 +277,13 @@ const HomeScreen = ({ currentTime, data, onLogin, clockedInUsers = [] }) => (
         <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
       </div>
       <div className="flex items-center gap-4">
-        {clockedInUsers.length > 0 && (
-          <div className="logged-in-indicators">
-            {clockedInUsers.slice(0, 6).map(user => (
-              <div key={user.id} className="indicator-avatar" title={user.name}>
-                {user.name.split(' ').map(n => n[0]).join('')}
-              </div>
-            ))}
-            {clockedInUsers.length > 6 && (
-              <div className="indicator-more">
-                +{clockedInUsers.length - 6}
-              </div>
-            )}
-          </div>
-        )}
         <button className="btn-proceed" onClick={onLogin}>
           <Clock size={24} />
         </button>
       </div>
     </div>
 
-    <Leaderboard entries={data.entries} projects={data.projects} />
+    <Leaderboard entries={data.entries} projects={data.projects} clockedInUsers={clockedInUsers} />
   </div>
 );
 
@@ -726,8 +728,8 @@ const App = () => {
                 {adminModal.item.type === 'OUT' && (
                   <div className="admin-split-editor">
                     <label style={labelStyle}>Project Allocation ({formData.duration?.toFixed(2)}h total)</label>
-                    <div className="project-controls" style={{ marginTop: '0.5rem' }}>
-                      {data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => {
+                    <div className="project-controls" style={{ marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                      {(() => {
                         let selected = [];
                         let shares = {};
                         try {
@@ -743,7 +745,6 @@ const App = () => {
                           }
                         } catch (e) { console.error(e); }
 
-                        const isSelected = selected.includes(p.name);
                         const updateEntryProject = (projName) => {
                           let nextSelected;
                           if (selected.includes(projName)) {
@@ -794,29 +795,32 @@ const App = () => {
                           setFormData({ ...formData, project: `SPLIT:${JSON.stringify(newSplitData)}` });
                         };
 
-                        return (
-                          <div key={p.id} className="project-control-item" onClick={() => updateEntryProject(p.name)} style={{ padding: '0.5rem', marginBottom: '0.5rem', cursor: 'pointer', borderColor: isSelected ? 'var(--primary)' : 'var(--glass-border)', background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}>
-                            <div className="flex items-center justify-between w-full">
-                              <span style={{ fontSize: '0.85rem' }}>{p.name}</span>
-                              {isSelected && selected.length > 1 && (
-                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                  <input
-                                    type="number"
-                                    className="percent-input"
-                                    style={{ width: '50px', padding: '0.2rem', fontSize: '0.75rem' }}
-                                    value={Math.round(shares[p.name] || 0)}
-                                    onChange={e => updateEntryShare(p.name, e.target.value)}
-                                  />
-                                  <span style={{ fontSize: '0.75rem' }}>%</span>
-                                </div>
-                              )}
-                              {isSelected && selected.length === 1 && (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>100%</span>
-                              )}
+                        return data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => {
+                          const isSelected = selected.includes(p.name);
+                          return (
+                            <div key={p.id} className="project-control-item" onClick={() => updateEntryProject(p.name)} style={{ padding: '0.5rem', marginBottom: '0.5rem', cursor: 'pointer', borderColor: isSelected ? 'var(--primary)' : 'var(--glass-border)', background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}>
+                              <div className="flex items-center justify-between w-full">
+                                <span style={{ fontSize: '0.85rem' }}>{p.name}</span>
+                                {isSelected && selected.length > 1 && (
+                                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                    <input
+                                      type="number"
+                                      className="percent-input"
+                                      style={{ width: '50px', padding: '0.2rem', fontSize: '0.75rem' }}
+                                      value={Math.round(shares[p.name] || 0)}
+                                      onChange={e => updateEntryShare(p.name, e.target.value)}
+                                    />
+                                    <span style={{ fontSize: '0.75rem' }}>%</span>
+                                  </div>
+                                )}
+                                {isSelected && selected.length === 1 && (
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>100%</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 )}
