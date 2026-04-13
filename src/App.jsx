@@ -253,16 +253,32 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
   </div>
 );
 
-const HomeScreen = ({ currentTime, data, onLogin }) => (
+const HomeScreen = ({ currentTime, data, onLogin, clockedInUsers = [] }) => (
   <div className="flex flex-col h-full">
     <div className="home-header home-header-main">
       <div className="header-left">
         <div className="clock">{format(currentTime, 'h:mm a')}</div>
         <div className="date">{format(currentTime, 'EEEE, MMMM do')}</div>
       </div>
-      <button className="btn-proceed" onClick={onLogin}>
-        <Clock size={24} />
-      </button>
+      <div className="flex items-center gap-4">
+        {clockedInUsers.length > 0 && (
+          <div className="logged-in-indicators">
+            {clockedInUsers.slice(0, 6).map(user => (
+              <div key={user.id} className="indicator-avatar" title={user.name}>
+                {user.name.split(' ').map(n => n[0]).join('')}
+              </div>
+            ))}
+            {clockedInUsers.length > 6 && (
+              <div className="indicator-more">
+                +{clockedInUsers.length - 6}
+              </div>
+            )}
+          </div>
+        )}
+        <button className="btn-proceed" onClick={onLogin}>
+          <Clock size={24} />
+        </button>
+      </div>
     </div>
 
     <Leaderboard entries={data.entries} projects={data.projects} />
@@ -538,7 +554,21 @@ const App = () => {
   const handleEdit = (type, item) => {
     setAdminModal({ action: 'edit', type, item });
     if (type === 'user') setFormData({ name: item.name, pin: item.pin, role: item.role });
-    else if (type === 'entry') setFormData({ timestamp: item.timestamp, reason: '' });
+    else if (type === 'entry') {
+      let duration = 0;
+      if (item.type === 'OUT') {
+        const inEntry = data.entries.find(e => e.type === 'IN' && (e.sessionid === item.sessionid || e.id === item.sessionid));
+        if (inEntry) {
+          duration = (new Date(item.timestamp) - new Date(inEntry.timestamp)) / (1000 * 60 * 60);
+        }
+      }
+      setFormData({
+        timestamp: item.timestamp,
+        reason: '',
+        project: item.project || '',
+        duration: duration > 0 ? duration : 0
+      });
+    }
   };
 
   const handleAdminModalSubmit = async (e) => {
@@ -559,15 +589,34 @@ const App = () => {
       if (!name || !pin || !role) return alert('All fields are required');
       payload = { action: 'updateuser', id: item.id, name, pin, role };
     } else if (action === 'edit' && type === 'entry') {
-      const { timestamp, reason } = formData;
+      const { timestamp, reason, project } = formData;
       if (!timestamp || !reason) return alert('All fields are required');
+
+      let splits = '';
+      if (project && project.startsWith('SPLIT:')) {
+        try {
+          const splitObj = JSON.parse(project.substring(6));
+          const totalHours = Object.values(splitObj).reduce((sum, h) => sum + Number(h), 0);
+          splits = Object.entries(splitObj)
+            .map(([p, h]) => {
+              const pct = totalHours > 0 ? (Number(h) / totalHours) * 100 : 0;
+              return `${p} (${pct.toFixed(0)}%)`;
+            })
+            .join(', ');
+        } catch (e) {
+          console.error('Error creating split string:', e);
+        }
+      }
+
       payload = {
         action: 'editentry',
         entryId: item.id,
         oldTimestamp: item.timestamp,
         newTimestamp: timestamp,
         adminId: 'SYSTEM',
-        reason
+        reason,
+        project,
+        splits
       };
     }
 
@@ -639,6 +688,119 @@ const App = () => {
                   <label style={labelStyle}>Reason for correction</label>
                   <input type="text" style={inputStyle} value={formData.reason || ''} onChange={e => setFormData({ ...formData, reason: e.target.value })} required />
                 </div>
+
+                {adminModal.item.type === 'OUT' && (
+                  <div className="admin-split-editor">
+                    <label style={labelStyle}>Project Allocation ({formData.duration?.toFixed(2)}h total)</label>
+                    <div className="project-controls" style={{ marginTop: '0.5rem' }}>
+                      {data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => {
+                        let selected = [];
+                        let shares = {};
+                        try {
+                          if (formData.project?.startsWith('SPLIT:')) {
+                            const splitData = JSON.parse(formData.project.substring(6));
+                            selected = Object.keys(splitData);
+                            Object.entries(splitData).forEach(([proj, hours]) => {
+                              shares[proj] = (Number(hours) / (formData.duration || 1)) * 100;
+                            });
+                          } else if (formData.project) {
+                            selected = [formData.project];
+                            shares[formData.project] = 100;
+                          }
+                        } catch (e) { console.error(e); }
+
+                        const isSelected = selected.includes(p.name);
+                        const updateEntryProject = (projName) => {
+                          let nextSelected;
+                          if (selected.includes(projName)) {
+                            nextSelected = selected.filter(pn => pn !== projName);
+                          } else if (selected.length < 3) {
+                            nextSelected = [...selected, projName];
+                          } else {
+                            return;
+                          }
+
+                          if (nextSelected.length === 0) {
+                            setFormData({ ...formData, project: '' });
+                          } else if (nextSelected.length === 1) {
+                            setFormData({ ...formData, project: nextSelected[0] });
+                          } else {
+                            const newSplitData = {};
+                            const share = 100 / nextSelected.length;
+                            nextSelected.forEach(pn => {
+                              newSplitData[pn] = ((share / 100) * (formData.duration || 0)).toFixed(4);
+                            });
+                            setFormData({ ...formData, project: `SPLIT:${JSON.stringify(newSplitData)}` });
+                          }
+                        };
+
+                        const updateEntryShare = (projName, newPct) => {
+                          if (selected.length < 2) return;
+                          const pct = Math.min(100, Math.max(0, Number(newPct) || 0));
+                          const otherProjects = selected.filter(pn => pn !== projName);
+                          const oldPct = shares[projName] || 0;
+                          const delta = pct - oldPct;
+                          const shareToTake = delta / otherProjects.length;
+
+                          const newShares = { ...shares, [projName]: pct };
+                          otherProjects.forEach(pn => {
+                            newShares[pn] = Math.max(0, (newShares[pn] || 0) - shareToTake);
+                          });
+
+                          const total = Object.values(newShares).reduce((a, b) => a + b, 0);
+                          if (total !== 100 && total > 0) {
+                            const diff = 100 - total;
+                            newShares[otherProjects[0]] = Math.max(0, (newShares[otherProjects[0]] || 0) + diff);
+                          }
+
+                          const newSplitData = {};
+                          selected.forEach(pn => {
+                            newSplitData[pn] = ((newShares[pn] / 100) * (formData.duration || 0)).toFixed(4);
+                          });
+                          setFormData({ ...formData, project: `SPLIT:${JSON.stringify(newSplitData)}` });
+                        };
+
+                        return (
+                          <div key={p.id} className="project-control-item" onClick={() => updateEntryProject(p.name)} style={{ padding: '0.5rem', marginBottom: '0.5rem', cursor: 'pointer', borderColor: isSelected ? 'var(--primary)' : 'var(--glass-border)', background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}>
+                            <div className="flex items-center justify-between w-full">
+                              <span style={{ fontSize: '0.85rem' }}>{p.name}</span>
+                              {isSelected && selected.length > 1 && (
+                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                  <input
+                                    type="number"
+                                    className="percent-input"
+                                    style={{ width: '50px', padding: '0.2rem', fontSize: '0.75rem' }}
+                                    value={Math.round(shares[p.name] || 0)}
+                                    onChange={e => updateEntryShare(p.name, e.target.value)}
+                                  />
+                                  <span style={{ fontSize: '0.75rem' }}>%</span>
+                                </div>
+                              )}
+                              {isSelected && selected.length === 1 && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>100%</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {adminModal.item.type === 'IN' && (
+                  <div>
+                    <label style={labelStyle}>Project</label>
+                    <select
+                      style={{ ...inputStyle, background: '#1e1b4b' }}
+                      value={formData.project || ''}
+                      onChange={e => setFormData({ ...formData, project: e.target.value })}
+                    >
+                      <option value="">No Project</option>
+                      {data.projects.filter(p => String(p.archived).toUpperCase() !== 'TRUE').map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </>
             )}
 
@@ -747,6 +909,10 @@ const App = () => {
     );
   }
 
+  const clockedInUsers = data.users.filter(u =>
+    String(u.archived).toUpperCase() !== 'TRUE' && getUserStatus(u.id).clockedIn
+  );
+
   return (
     <div className="app-container animate-fade-in">
       {/* Loading Overlay for subsequent actions */}
@@ -774,6 +940,7 @@ const App = () => {
           currentTime={currentTime}
           data={data}
           onLogin={() => setView('login')}
+          clockedInUsers={clockedInUsers}
         />
       ) : (
         <div className="flex flex-col h-full animate-fade-in">

@@ -225,6 +225,12 @@ function handleEditEntry(data) {
     if (String(rows[i][0]).trim() === String(data.entryId).trim()) {
       sheet.getRange(i + 1, 5).setValue(data.newTimestamp);
       sheet.getRange(i + 1, 6).setValue('Edited by Admin: ' + data.reason);
+      if (data.project !== undefined) {
+        sheet.getRange(i + 1, 3).setValue(data.project);
+      }
+      if (data.splits !== undefined) {
+        sheet.getRange(i + 1, 8).setValue(data.splits);
+      }
       return jsonResponse({ success: true });
     }
   }
