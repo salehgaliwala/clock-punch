@@ -843,3 +843,59 @@ body {
 .text-primary {
   color: var(--primary);
 }
+
+/* Logged-in Indicators */
+.logged-in-indicators {
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+}
+
+.indicator-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #1e1b4b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: -12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+  cursor: help;
+}
+
+.indicator-avatar:first-child {
+  margin-left: 0;
+}
+
+.indicator-avatar:hover {
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.indicator-more {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid #1e1b4b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: -12px;
+  color: var(--text-muted);
+}
+
+.admin-split-editor {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+}
