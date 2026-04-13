@@ -851,13 +851,17 @@ body {
 
 .login-btn-container {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .indicators-absolute {
   position: absolute;
-  top: -12px;
-  right: -12px;
+  left: calc(100% + 1rem);
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 5;
+  display: flex;
 }
 
 /* Logged-in Indicators */
