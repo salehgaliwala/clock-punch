@@ -533,14 +533,17 @@ const App = () => {
     setView('home');
   }, []);
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const handlePunch = useCallback(async (project = '', userOverride = null) => {
     const user = userOverride || selectedUser;
-    if (!user) return;
+    if (!user || isProcessing) return;
 
     const userStatus = getUserStatus(user.id);
     const type = userStatus.clockedIn ? 'OUT' : 'IN';
 
     try {
+      setIsProcessing(true);
       setLoading(true);
       console.log('Sending punch:', { action: 'punch', userId: user.id, project, type });
       const resp = await fetch(API_URL, {
@@ -555,20 +558,28 @@ const App = () => {
       });
       const resJson = await resp.json();
       console.log('Punch response:', resJson);
-      if (resJson.error) throw new Error(resJson.error);
+
+      if (resJson.error) {
+        throw new Error(resJson.error);
+      }
+
+      // Hide modal immediately so user knows it's processed
+      setModalType(null);
 
       // Brief delay (1.5s) to ensure Google Sheets has processed the row before we fetch
       setTimeout(async () => {
         await fetchData();
         resetState();
+        setIsProcessing(false);
+        setLoading(false);
       }, 1500);
     } catch (error) {
       console.error('Punch error details:', error);
       alert('Punch failed: ' + error.message);
-    } finally {
+      setIsProcessing(false);
       setLoading(false);
     }
-  }, [selectedUser, fetchData, getUserStatus, resetState]);
+  }, [selectedUser, fetchData, getUserStatus, resetState, isProcessing]);
 
   const handleAdd = (type) => {
     setAdminModal({ action: 'add', type });
@@ -603,8 +614,19 @@ const App = () => {
           duration = (new Date(item.timestamp) - new Date(inEntry.timestamp)) / (1000 * 60 * 60);
         }
       }
+
+      // Convert UTC timestamp to local format for datetime-local input (yyyy-MM-ddTHH:mm)
+      let localTimestamp = '';
+      if (item.timestamp) {
+        const d = new Date(item.timestamp);
+        if (!isNaN(d.getTime())) {
+          const pad = (n) => n.toString().padStart(2, '0');
+          localTimestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+      }
+
       setFormData({
-        timestamp: item.timestamp,
+        timestamp: localTimestamp,
         reason: '',
         project: item.project || '',
         duration: duration > 0 ? duration : 0
@@ -722,8 +744,8 @@ const App = () => {
             {type === 'entry' && (
               <>
                 <div>
-                  <label style={labelStyle}>Timestamp (ISO Format)</label>
-                  <input type="text" style={inputStyle} value={formData.timestamp || ''} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} required autoFocus />
+                  <label style={labelStyle}>Timestamp (Local Time)</label>
+                  <input type="datetime-local" style={inputStyle} value={formData.timestamp || ''} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} required autoFocus />
                 </div>
                 <div>
                   <label style={labelStyle}>Reason for correction</label>
@@ -858,6 +880,7 @@ const App = () => {
   };
 
   const handlePinSubmit = useCallback(() => {
+    if (isProcessing) return;
     const enteredPin = pin.toString().trim();
     const currentUser = selectedUser; // Capture currently selected user
     setPin(''); // Clear PIN immediately
@@ -893,7 +916,7 @@ const App = () => {
     } else {
       alert('Incorrect PIN');
     }
-  }, [pin, modalMode, data.users, selectedUser, handlePunch, getUserStatus, resetState]);
+  }, [pin, modalMode, data.users, selectedUser, handlePunch, getUserStatus, resetState, isProcessing]);
 
   const handleAdminAuth = () => {
     setModalMode('admin');
@@ -910,8 +933,8 @@ const App = () => {
 
 
   const renderPinPad = () => (
-    <div className="modal-overlay animate-fade-in" onClick={resetState}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay animate-fade-in" onClick={!isProcessing ? resetState : undefined}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ opacity: isProcessing ? 0.7 : 1, pointerEvents: isProcessing ? 'none' : 'auto' }}>
         <div className="modal-title">
           {modalMode === 'admin' ? 'Enter Admin PIN' : `Enter PIN for ${selectedUser?.name}`}
         </div>
@@ -935,12 +958,14 @@ const App = () => {
   );
 
   const renderProjectSelector = () => (
-    <ClockOutPopup
-      duration={clockOutDuration}
-      projects={data.projects}
-      onConfirm={(p) => handlePunch(p)}
-      onClose={resetState}
-    />
+    <div style={{ opacity: isProcessing ? 0.7 : 1, pointerEvents: isProcessing ? 'none' : 'auto' }}>
+      <ClockOutPopup
+        duration={clockOutDuration}
+        projects={data.projects}
+        onConfirm={(p) => handlePunch(p)}
+        onClose={resetState}
+      />
+    </div>
   );
 
   if (loading && data.users.length === 0) {

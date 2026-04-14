@@ -59,6 +59,17 @@ function doPost(e) {
 
 function handlePunch(data) {
   const sheet = getSheetByNameRobust('Entries');
+
+  // Prevent duplicate punches (Double IN or Double OUT)
+  const entries = getSheetData('Entries');
+  const lastStatus = getUserStatusForAuto(data.userId, entries);
+  if (data.type === 'IN' && lastStatus.clockedIn) {
+    return jsonResponse({ error: 'User is already clocked in' });
+  }
+  if (data.type === 'OUT' && !lastStatus.clockedIn) {
+    return jsonResponse({ error: 'User is already clocked out' });
+  }
+
   const now = new Date();
   const tz = Session.getScriptTimeZone();
   const timestampStr = Utilities.formatDate(now, tz, "yyyy-MM-dd HH:mm:ss");
@@ -210,20 +221,26 @@ function handleEditEntry(data) {
   const sheet = getSheetByNameRobust('Entries');
   const rows = sheet.getDataRange().getValues();
   
+  // Parse incoming local timestamp string as a Date object relative to the script/sheet timezone
+  // data.newTimestamp is in "yyyy-MM-ddTHH:mm" format
+  const localDate = new Date(data.newTimestamp.replace('T', ' '));
+  const tz = Session.getScriptTimeZone();
+  const formattedTimestamp = Utilities.formatDate(localDate, tz, "yyyy-MM-dd HH:mm:ss");
+
   // Record correction first
   const corrSheet = getSheetByNameRobust('Corrections');
   corrSheet.appendRow([
     Utilities.getUuid(),
     data.entryId,
     data.oldTimestamp,
-    data.newTimestamp,
+    formattedTimestamp,
     data.adminId,
     data.reason
   ]);
 
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.entryId).trim()) {
-      sheet.getRange(i + 1, 5).setValue(data.newTimestamp);
+      sheet.getRange(i + 1, 5).setValue(formattedTimestamp);
       sheet.getRange(i + 1, 6).setValue(data.reason);
       if (data.project !== undefined) {
         sheet.getRange(i + 1, 3).setValue(data.project);
@@ -292,9 +309,9 @@ function autoClockOutAll() {
       const tz = Session.getScriptTimeZone();
       const lastIn = new Date(status.lastPunch);
       
-      // Use the same day as the clock-in, but at 6:00 PM
+      // Use the same day as the clock-in, but at 7:00 PM
       const autoOutTime = new Date(lastIn.getTime());
-      autoOutTime.setHours(18, 0, 0, 0);
+      autoOutTime.setHours(19, 0, 0, 0);
       
       const timestampStr = Utilities.formatDate(autoOutTime, tz, "yyyy-MM-dd HH:mm:ss");
       
@@ -304,7 +321,7 @@ function autoClockOutAll() {
         'Auto-System', // Project name for auto-outs
         'OUT',
         timestampStr,
-        'Automatic 6:00 PM clock-out',
+        'Automatic 7:00 PM clock-out',
         status.lastInId || '', // Session ID
         '' // Splits (empty for auto)
       ]);
