@@ -59,6 +59,17 @@ function doPost(e) {
 
 function handlePunch(data) {
   const sheet = getSheetByNameRobust('Entries');
+
+  // Prevent duplicate punches (Double IN or Double OUT)
+  const entries = getSheetData('Entries');
+  const lastStatus = getUserStatusForAuto(data.userId, entries);
+  if (data.type === 'IN' && lastStatus.clockedIn) {
+    return jsonResponse({ error: 'User is already clocked in' });
+  }
+  if (data.type === 'OUT' && !lastStatus.clockedIn) {
+    return jsonResponse({ error: 'User is already clocked out' });
+  }
+
   const now = new Date();
   const tz = Session.getScriptTimeZone();
   const timestampStr = Utilities.formatDate(now, tz, "yyyy-MM-dd HH:mm:ss");
