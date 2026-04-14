@@ -221,20 +221,26 @@ function handleEditEntry(data) {
   const sheet = getSheetByNameRobust('Entries');
   const rows = sheet.getDataRange().getValues();
   
+  // Parse incoming local timestamp string as a Date object relative to the script/sheet timezone
+  // data.newTimestamp is in "yyyy-MM-ddTHH:mm" format
+  const localDate = new Date(data.newTimestamp.replace('T', ' '));
+  const tz = Session.getScriptTimeZone();
+  const formattedTimestamp = Utilities.formatDate(localDate, tz, "yyyy-MM-dd HH:mm:ss");
+
   // Record correction first
   const corrSheet = getSheetByNameRobust('Corrections');
   corrSheet.appendRow([
     Utilities.getUuid(),
     data.entryId,
     data.oldTimestamp,
-    data.newTimestamp,
+    formattedTimestamp,
     data.adminId,
     data.reason
   ]);
 
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.entryId).trim()) {
-      sheet.getRange(i + 1, 5).setValue(data.newTimestamp);
+      sheet.getRange(i + 1, 5).setValue(formattedTimestamp);
       sheet.getRange(i + 1, 6).setValue(data.reason);
       if (data.project !== undefined) {
         sheet.getRange(i + 1, 3).setValue(data.project);

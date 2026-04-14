@@ -614,8 +614,19 @@ const App = () => {
           duration = (new Date(item.timestamp) - new Date(inEntry.timestamp)) / (1000 * 60 * 60);
         }
       }
+
+      // Convert UTC timestamp to local format for datetime-local input (yyyy-MM-ddTHH:mm)
+      let localTimestamp = '';
+      if (item.timestamp) {
+        const d = new Date(item.timestamp);
+        if (!isNaN(d.getTime())) {
+          const pad = (n) => n.toString().padStart(2, '0');
+          localTimestamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+      }
+
       setFormData({
-        timestamp: item.timestamp,
+        timestamp: localTimestamp,
         reason: '',
         project: item.project || '',
         duration: duration > 0 ? duration : 0
@@ -733,8 +744,8 @@ const App = () => {
             {type === 'entry' && (
               <>
                 <div>
-                  <label style={labelStyle}>Timestamp (ISO Format)</label>
-                  <input type="text" style={inputStyle} value={formData.timestamp || ''} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} required autoFocus />
+                  <label style={labelStyle}>Timestamp (Local Time)</label>
+                  <input type="datetime-local" style={inputStyle} value={formData.timestamp || ''} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} required autoFocus />
                 </div>
                 <div>
                   <label style={labelStyle}>Reason for correction</label>
