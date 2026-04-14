@@ -303,9 +303,9 @@ function autoClockOutAll() {
       const tz = Session.getScriptTimeZone();
       const lastIn = new Date(status.lastPunch);
       
-      // Use the same day as the clock-in, but at 6:00 PM
+      // Use the same day as the clock-in, but at 7:00 PM
       const autoOutTime = new Date(lastIn.getTime());
-      autoOutTime.setHours(18, 0, 0, 0);
+      autoOutTime.setHours(19, 0, 0, 0);
       
       const timestampStr = Utilities.formatDate(autoOutTime, tz, "yyyy-MM-dd HH:mm:ss");
       
@@ -315,7 +315,7 @@ function autoClockOutAll() {
         'Auto-System', // Project name for auto-outs
         'OUT',
         timestampStr,
-        'Automatic 6:00 PM clock-out',
+        'Automatic 7:00 PM clock-out',
         status.lastInId || '', // Session ID
         '' // Splits (empty for auto)
       ]);
