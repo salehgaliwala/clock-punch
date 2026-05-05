@@ -469,7 +469,23 @@ const App = () => {
   useEffect(() => {
     fetchData();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+
+    // Refresh data every hour (3,600,000 ms) to catch backend auto-outs
+    const refreshInterval = setInterval(fetchData, 3600000);
+
+    // Refresh when app becomes visible (e.g., user returns to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchData]);
 
   // Sync duration and splits when admin edits timestamp
