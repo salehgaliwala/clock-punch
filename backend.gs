@@ -49,6 +49,10 @@ function doPost(e) {
         return handleDeleteProject(data);
       case 'editentry':
         return handleEditEntry(data);
+      case 'deleteentry':
+        return handleDeleteEntry(data);
+      case 'purgeentries':
+        return handlePurgeEntries(data);
       default:
         return jsonResponse({ error: 'Unknown action' });
     }
@@ -215,6 +219,60 @@ function handleDeleteProject(data) {
     }
   }
   return jsonResponse({ error: 'Project not found' });
+}
+
+function handleDeleteEntry(data) {
+  const sheet = getSheetByNameRobust('Entries');
+  const rows = sheet.getDataRange().getValues();
+  const targetId = String(data.entryId || data.id).trim();
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === targetId) {
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success: true, message: 'Entry deleted' });
+    }
+  }
+  return jsonResponse({ error: 'Entry not found' });
+}
+
+function handlePurgeEntries(data) {
+  const sheet = getSheetByNameRobust('Entries');
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) {
+    return jsonResponse({ success: true, count: 0, message: 'No entries to purge' });
+  }
+
+  const headers = rows[0].map(h => String(h).toLowerCase().trim());
+  const tsIdx = headers.indexOf('timestamp');
+  if (tsIdx === -1) {
+    return jsonResponse({ error: 'Timestamp column not found' });
+  }
+
+  let start = new Date(data.startDate);
+  if (!data.startDate.includes('T')) {
+    start = new Date(data.startDate + 'T00:00:00');
+  }
+
+  let end = new Date(data.endDate);
+  if (!data.endDate.includes('T')) {
+    end = new Date(data.endDate + 'T23:59:59.999');
+  }
+
+  let count = 0;
+  // Iterate backwards to safely delete rows without messing up indices
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const ts = rows[i][tsIdx];
+    if (!ts) continue;
+    const tsDate = new Date(ts);
+    if (isNaN(tsDate.getTime())) continue;
+
+    if (tsDate >= start && tsDate <= end) {
+      sheet.deleteRow(i + 1);
+      count++;
+    }
+  }
+
+  return jsonResponse({ success: true, count, message: `Purged ${count} entries` });
 }
 
 function handleEditEntry(data) {

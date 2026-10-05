@@ -140,7 +140,16 @@ const Leaderboard = ({ entries, projects }) => {
 };
 
 
-const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete, onEdit }) => (
+const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete, onEdit, onPurgeEntries }) => {
+  const [purgeStart, setPurgeStart] = useState('');
+  const [purgeEnd, setPurgeEnd] = useState('');
+
+  const handlePurgeSubmit = (e) => {
+    e.preventDefault();
+    onPurgeEntries(purgeStart, purgeEnd);
+  };
+
+  return (
   <div className="admin-container">
     <div className="admin-header">
       <div className="flex items-center gap-2">
@@ -208,38 +217,72 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
       )}
 
       {adminTab === 'entries' && (
-        <table className="admin-table">
-          <thead>
-            <tr><th>User</th><th>Type</th><th>Time</th><th>Project</th><th>Note</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {data.entries.slice().reverse().map(e => (
-              <tr key={e.id}>
-                <td>{data.users.find(u => u.id == getVal(e, 'userid', 'userId', 'user id', 'uid'))?.name}</td>
-                <td style={{ color: e.type === 'IN' ? 'var(--status-in)' : 'var(--status-out)' }}>{e.type}</td>
-                <td>{safeDateFormat(e.timestamp, 'MMM d, HH:mm')}</td>
-                <td>
-                  {e.project?.startsWith('SPLIT:') ? (
-                    <div className="split-info">
-                      <span className="text-primary font-bold">Split Project</span>
-                      <div className="split-entry-text">
-                        {Object.entries(JSON.parse(e.project.substring(6)))
-                          .map(([p, h]) => `${p} (${Number(h).toFixed(1)}h)`)
-                          .join(', ')}
+        <>
+          <div className="purge-section" style={{ padding: '1rem', marginBottom: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', fontWeight: 600 }}>Purge Entries Range</h4>
+            <form onSubmit={handlePurgeSubmit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Start:</label>
+                <input
+                  type="date"
+                  value={purgeStart}
+                  onChange={e => setPurgeStart(e.target.value)}
+                  style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.85rem' }}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>End:</label>
+                <input
+                  type="date"
+                  value={purgeEnd}
+                  onChange={e => setPurgeEnd(e.target.value)}
+                  style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', fontSize: '0.85rem' }}
+                  required
+                />
+              </div>
+              <button type="submit" className="admin-btn admin-btn-danger" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+                <Trash2 size={14} /> Purge Entries
+              </button>
+            </form>
+          </div>
+
+          <table className="admin-table">
+            <thead>
+              <tr><th>User</th><th>Type</th><th>Time</th><th>Project</th><th>Note</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {data.entries.slice().reverse().map(e => (
+                <tr key={e.id}>
+                  <td>{data.users.find(u => u.id == getVal(e, 'userid', 'userId', 'user id', 'uid'))?.name}</td>
+                  <td style={{ color: e.type === 'IN' ? 'var(--status-in)' : 'var(--status-out)' }}>{e.type}</td>
+                  <td>{safeDateFormat(e.timestamp, 'MMM d, HH:mm')}</td>
+                  <td>
+                    {e.project?.startsWith('SPLIT:') ? (
+                      <div className="split-info">
+                        <span className="text-primary font-bold">Split Project</span>
+                        <div className="split-entry-text">
+                          {Object.entries(JSON.parse(e.project.substring(6)))
+                            .map(([p, h]) => `${p} (${Number(h).toFixed(1)}h)`)
+                            .join(', ')}
+                        </div>
                       </div>
+                    ) : (
+                      e.project
+                    )}
+                  </td>
+                  <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{e.note}</td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button className="admin-btn admin-btn-primary" onClick={() => onEdit('entry', e)}><Edit size={14} /></button>
+                      <button className="admin-btn admin-btn-danger" onClick={() => onDelete('entry', e.id)}><Trash2 size={14} /></button>
                     </div>
-                  ) : (
-                    e.project
-                  )}
-                </td>
-                <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{e.note}</td>
-                <td>
-                  <button className="admin-btn admin-btn-primary" onClick={() => onEdit('entry', e)}><Edit size={14} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
 
@@ -253,7 +296,8 @@ const AdminPanel = ({ data, adminTab, setAdminTab, setShowAdmin, onAdd, onDelete
       </button>
     )}
   </div>
-);
+  );
+};
 
 const HomeScreen = ({ currentTime, data, onLogin, clockedInUsers = [] }) => (
   <div className="flex flex-col h-full">
@@ -604,16 +648,104 @@ const App = () => {
   };
 
   const handleDelete = async (type, id) => {
-    if (!confirm(`Are you sure you want to delete this ${type}?`)) return;
+    if (!confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) return;
     setLoading(true);
+
+    if (!API_URL || API_URL.includes('YOUR_SCRIPT_ID')) {
+      if (type === 'entry') {
+        setData(prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== id) }));
+      } else if (type === 'user') {
+        setData(prev => ({
+          ...prev,
+          users: prev.users.map(u => u.id === id ? { ...u, archived: 'TRUE' } : u)
+        }));
+      } else if (type === 'project') {
+        setData(prev => ({
+          ...prev,
+          projects: prev.projects.map(p => p.id === id ? { ...p, archived: 'TRUE' } : p)
+        }));
+      }
+      setLoading(false);
+      return;
+    }
+
     try {
-      const action = type === 'user' ? 'deleteuser' : 'deleteproject';
+      let action = '';
+      let payload = { action, id };
+      if (type === 'user') action = 'deleteuser';
+      else if (type === 'project') action = 'deleteproject';
+      else if (type === 'entry') {
+        action = 'deleteentry';
+        payload = { action, entryId: id };
+      }
+
       const res = await fetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({ action, id })
+        body: JSON.stringify(payload)
       });
       const resJson = await res.json();
       if (resJson.error) throw new Error(resJson.error);
+      await fetchData();
+    } catch (e) { alert(e.message); }
+    setLoading(false);
+  };
+
+  const handlePurgeEntries = async (startDateStr, endDateStr) => {
+    if (!startDateStr || !endDateStr) {
+      return alert('Please select both Start Date and End Date.');
+    }
+
+    const start = new Date(startDateStr + 'T00:00:00');
+    const end = new Date(endDateStr + 'T23:59:59.999');
+
+    if (start > end) {
+      return alert('Start Date must be before or equal to End Date.');
+    }
+
+    // Count matching entries first
+    const matchingCount = data.entries.filter(e => {
+      if (!e.timestamp) return false;
+      const d = new Date(e.timestamp);
+      return !isNaN(d.getTime()) && d >= start && d <= end;
+    }).length;
+
+    if (matchingCount === 0) {
+      return alert('No entries found within the selected date range.');
+    }
+
+    if (!confirm(`Are you sure you want to PERMANENTLY purge ${matchingCount} entry/entries from ${startDateStr} to ${endDateStr}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setLoading(true);
+
+    if (!API_URL || API_URL.includes('YOUR_SCRIPT_ID')) {
+      setData(prev => ({
+        ...prev,
+        entries: prev.entries.filter(e => {
+          if (!e.timestamp) return true;
+          const d = new Date(e.timestamp);
+          if (isNaN(d.getTime())) return true;
+          return d < start || d > end;
+        })
+      }));
+      alert(`Successfully purged ${matchingCount} entries.`);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'purgeentries',
+          startDate: startDateStr,
+          endDate: endDateStr
+        })
+      });
+      const resJson = await res.json();
+      if (resJson.error) throw new Error(resJson.error);
+      alert(resJson.message || `Successfully purged ${resJson.count || matchingCount} entries.`);
       await fetchData();
     } catch (e) { alert(e.message); }
     setLoading(false);
@@ -1016,6 +1148,7 @@ const App = () => {
           onAdd={handleAdd}
           onDelete={handleDelete}
           onEdit={handleEdit}
+          onPurgeEntries={handlePurgeEntries}
         />
       )}
 
